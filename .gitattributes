@@ -1,5 +1,15 @@
-# Set the default behavior, in case people don't have core.autocrlf set.
-* text=auto
+# Needed for publishing of examples, build worker defaults to core.autocrlf=input.
+* text eol=autocrlf
 
-*.md text eol=crlf
-*.yml text eol=crlf
+*.mof   text eol=crlf
+*.sh    text eol=lf
+*.svg   eol=lf
+
+# Ensure any exe files are treated as binary
+*.exe binary
+*.jpg binary
+*.xl* binary
+*.pfx binary
+*.png binary
+*.dll binary
+*.so  binary
