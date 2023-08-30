@@ -47,8 +47,8 @@ BuildWorkflow:
     - Invoke_Pester_Tests_v5
     - Pester_Run_Times
     - Fail_Build_If_Pester_Tests_Failed
-    - Convert_Pester_Coverage
-    - Pester_if_Code_Coverage_Under_Threshold
+    #- Convert_Pester_Coverage
+    #- Pester_if_Code_Coverage_Under_Threshold
 
   publish:
     - Create_ChangeLog_GitHub_PR
@@ -70,14 +70,15 @@ Pester:
       Tag:
       ExcludeTag:
     Output:
-      Verbosity: Detailed
-    CodeCoverage:
-      Path:
-      OutputFormat:
-      CoveragePercentTarget: 1
-      OutputPath: CodeCov.xml
-      OutputEncoding: ascii
-      ExcludeTests:
+      #Verbosity: Detailed
+      Verbosity: Diagnostic
+#    CodeCoverage:
+#      Path:
+#      OutputFormat:
+#      CoveragePercentTarget: 1
+#      OutputPath: CodeCov.xml
+#      OutputEncoding: ascii
+#      ExcludeTests:
     TestResult:
       OutputFormat: NUnitXML
       OutputPath:

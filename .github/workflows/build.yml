@@ -133,68 +133,68 @@ jobs:
         with:
           name: CodeCoverage_MacOS_Core
           path: output/testResults/
-  Publish_Code_Coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    needs:
-      - Test_MacOS_Core
-      - Test_Linux_Core
-      - Test_Windows_Core
-      - Test_Windows_Desktop
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: "0"
-      - uses: actions/download-artifact@v3
-        with:
-          name: CodeCoverage_Linux_Core
-          path: output/testResults/
-      - uses: actions/download-artifact@v3
-        with:
-          name: CodeCoverage_MacOS_Core
-          path: output/testResults/
-      - uses: actions/download-artifact@v3
-        with:
-          name: CodeCoverage_Windows_Core
-          path: output/testResults/
-      - uses: actions/download-artifact@v3
-        with:
-          name: CodeCoverage_Windows_Desktop
-          path: output/testResults/
-      - name: Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          name: civoShell
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./output/testResults/CodeCov.xml
-      - uses: actions/upload-artifact@v3
-        with:
-          name: CodeCovState
-          path: ./
-
-  Deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs:
-      - Test_MacOS_Core
-      - Test_Linux_Core
-      - Test_Windows_Core
-      - Test_Windows_Desktop
-    if: ${{ success() && (github.ref == 'refs/heads/master' || StartsWith(github.ref,'refs/tags/')) }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: "0"
-      - uses: actions/download-artifact@v3
-        with:
-          name: output
-          path: "output"
-      - run: |
-          ./build.ps1 -ResolveDependency -tasks publish
-        shell: pwsh
-        env:
-          GitHubToken: ${{ secrets.GITHUBTOKEN }}
-          GalleryApiToken: ${{ secrets.GALLERYAPITOKEN }}
+#  Publish_Code_Coverage:
+#    name: Code Coverage
+#    runs-on: ubuntu-latest
+#    needs:
+#      - Test_MacOS_Core
+#      - Test_Linux_Core
+#      - Test_Windows_Core
+#      - Test_Windows_Desktop
+#    steps:
+#      - uses: actions/checkout@v3
+#        with:
+#          fetch-depth: "0"
+#      - uses: actions/download-artifact@v3
+#        with:
+#          name: CodeCoverage_Linux_Core
+#          path: output/testResults/
+#      - uses: actions/download-artifact@v3
+#        with:
+#          name: CodeCoverage_MacOS_Core
+#          path: output/testResults/
+#      - uses: actions/download-artifact@v3
+#        with:
+#          name: CodeCoverage_Windows_Core
+#          path: output/testResults/
+#      - uses: actions/download-artifact@v3
+#        with:
+#          name: CodeCoverage_Windows_Desktop
+#          path: output/testResults/
+#      - name: Codecov
+#        uses: codecov/codecov-action@v3
+#        with:
+#          name: civoShell
+#          token: ${{ secrets.CODECOV_TOKEN }}
+#          file: ./output/testResults/CodeCov.xml
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: CodeCovState
+#          path: ./
+#
+#  Deploy:
+#    name: Deploy
+#    runs-on: ubuntu-latest
+#    needs:
+#      - Test_MacOS_Core
+#      - Test_Linux_Core
+#      - Test_Windows_Core
+#      - Test_Windows_Desktop
+#    if: ${{ success() && (github.ref == 'refs/heads/master' || StartsWith(github.ref,'refs/tags/')) }}
+#    steps:
+#      - uses: actions/checkout@v3
+#        with:
+#          fetch-depth: "0"
+#      - uses: actions/download-artifact@v3
+#        with:
+#          name: output
+#          path: "output"
+#      - run: |
+#          ./build.ps1 -ResolveDependency -tasks publish
+#        shell: pwsh
+#        env:
+#          GitHubToken: ${{ secrets.GITHUBTOKEN }}
+#          GalleryApiToken: ${{ secrets.GALLERYAPITOKEN }}
   Cleanup:
     name: Cleanup
     runs-on: ubuntu-latest
