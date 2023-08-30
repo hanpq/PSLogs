@@ -6,7 +6,7 @@ BeforeDiscovery {
     }
     $ProjectPath = $RootItem.FullName
     $ProjectName = (Get-ChildItem $ProjectPath\*\*.psd1 | Where-Object {
-            ($_.Directory.Name -eq 'source') -and
+        ($_.Directory.Name -eq 'source') -and
             $(try
                 {
                     Test-ModuleManifest $_.FullName -ErrorAction Stop
@@ -14,28 +14,25 @@ BeforeDiscovery {
                 catch
                 {
                     $false
-                })
-        }
+                }) }
     ).BaseName
 
     Import-Module $ProjectName -Force
-
 }
 
 InModuleScope $ProjectName {
+    Describe Assert-FolderExist {
+        Context 'Default' {
+            It 'Folder is created' {
+                'TestDrive:\FolderDoesNotExists' | Assert-FolderExist
+                'TestDrive:\FolderDoesNotExists' | Should -Exist
+            }
 
-    Describe -Tags Targets, TargetConsole 'Console target' {
-        # Give time to the runspace to init the targets
-        Start-Sleep -Milliseconds 100
-
-        It 'should be available in the module' {
-            $Targets = Get-LoggingAvailableTarget
-            $Targets.Console | Should -Not -BeNullOrEmpty
-        }
-
-        It "shouldn't have required parameters" {
-            $Targets = Get-LoggingAvailableTarget
-            $Targets.Console.ParamsRequired | Should -BeNullOrEmpty
+            It 'Folder is still present' {
+                New-Item -Path 'TestDrive:\FolderExists' -ItemType Directory
+                'TestDrive:\FolderExists' | Assert-FolderExist
+                'TestDrive:\FolderExists' | Should -Exist
+            }
         }
     }
 }

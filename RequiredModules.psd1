@@ -12,6 +12,7 @@
     Pester                       = 'latest'
     Plaster                      = 'latest'
     ModuleBuilder                = 'latest'
+    Logging                = 'latest'
     ChangelogManagement          = 'latest'
     Sampler                      = 'latest'
     'Sampler.GitHubTasks'        = 'latest'
@@ -27,4 +28,5 @@
         }
         Version        = '3.0.18-beta18'
     }
+
 }
