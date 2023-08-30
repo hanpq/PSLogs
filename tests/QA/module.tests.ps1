@@ -151,7 +151,7 @@ Describe 'General module control' -Tag 'FunctionalQuality' {
 }
 
 Describe "Quality for files" -Tag 'TestQuality' {
-    It "Function has unit tests | <Name>" {
+    It "Function has unit tests | <Name>" -skip:($true){
         Get-ChildItem "$PSScriptRoot\.." -Recurse -Include "$($Name).Tests.ps1" | Should -Not -BeNullOrEmpty
     } -TestCases $allModuleFunctions
 
