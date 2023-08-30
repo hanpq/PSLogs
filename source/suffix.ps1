@@ -1,6 +1,6 @@
 ﻿# The content of this file will be appended to the end of the psm1 module file. This is useful for custom procesedures after all module functions are loaded.
-#Set-LoggingVariables
+Set-LoggingVariables
 
-#Start-LoggingManager
+Start-LoggingManager
 
-#$MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = { Stop-LoggingManager }
+$MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = { Stop-LoggingManager }
