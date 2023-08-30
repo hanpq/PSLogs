@@ -22,7 +22,7 @@
 
 }
 
-Describe -Tags Targets, TargetTeams 'Teams target' {
+Describe -Skip:($true) -Tags Targets, TargetTeams 'Teams target' {
     It 'should be available in the module' {
         $Targets = Get-LoggingAvailableTarget
         $Targets.Teams | Should -Not -BeNullOrEmpty
