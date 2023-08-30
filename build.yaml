@@ -49,6 +49,7 @@ BuildWorkflow:
     - Fail_Build_If_Pester_Tests_Failed
     - Convert_Pester_Coverage
     - Pester_if_Code_Coverage_Under_Threshold
+    - Unload_Module
 
   publish:
     - Create_ChangeLog_GitHub_PR
