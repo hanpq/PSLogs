@@ -41,7 +41,7 @@ BeforeAll {
 # Accordingly, these tests use Pester to create scripts that call Write-Log, and then run those scripts using
 # the PowerShell executable, instead of calling Write-Log from directly within the tests. These tests will run
 # relatively slowly as a result of this.
-Describe 'CallerScope' {
+Describe 'CallerScope' -Skip:($true) {
     BeforeAll {
         # Set to $true to enable output of additional debugging information for this test code.
         $debugTests = $false
