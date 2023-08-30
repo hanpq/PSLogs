@@ -65,7 +65,7 @@ Pester:
   Configuration:
     Run:
       Path:
-      ExcludePath: "*/tests/*"
+      ExcludePath: "*/unit/*"
     Filter:
       Tag:
       ExcludeTag:
