@@ -49,6 +49,11 @@ BuildWorkflow:
     - Fail_Build_If_Pester_Tests_Failed
     - Convert_Pester_Coverage
     - Pester_if_Code_Coverage_Under_Threshold
+# Unload_Module was added as a mitigation step. As the build process for tests runs the module is imported. As it is
+# imported in runs Start-LoggingManager and subsequently spawns an additional runspace for the logging process.
+# Once the powershell process running build is finished the process does not exit waiting for the runspace to be closed.
+# To close the runspace the function Stop-LoggingManager should be called. This is automatically done when the module is removed with Remove-Module.
+# Thats what this build task does to make sure the runspaces are properly closed before returning.
     - Unload_Module
 
   publish:

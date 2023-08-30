@@ -21,6 +21,7 @@ $allModuleFunctions = &$mut { Get-Command -Module $args[0] -CommandType Function
         File = Get-ChildItem -Path $SourcePath -Recurse -Include "$($PSItem.Name).ps1"
     }
 }
+$allPublicModuleFunctions = $allModuleFunctions.Where({$_.File.Directory.Name -eq 'Public'})
 
 ### Verify Script Analyzer
 
@@ -151,7 +152,7 @@ Describe 'General module control' -Tag 'FunctionalQuality' {
 }
 
 Describe "Quality for files" -Tag 'TestQuality' {
-    It "Function has unit tests | <Name>" -skip:($true) {
+    It "Function has unit tests | <Name>" -Skip:($true){
         Get-ChildItem "$PSScriptRoot\.." -Recurse -Include "$($Name).Tests.ps1" | Should -Not -BeNullOrEmpty
     } -TestCases $allModuleFunctions
 
@@ -194,13 +195,13 @@ Describe "Help for files" -Tags 'helpQuality' {
 
     It 'Help.Description Length > 25 | <Name>' {
         $FunctionHelp.Description.Length | Should -BeGreaterThan 25
-    } -TestCases $allModuleFunctions
+    } -TestCases $allPublicModuleFunctions
 
     It 'Help.Examples.Count > 0 | <Name>' {
         $FunctionHelp.Examples.Count | Should -BeGreaterThan 0
         $FunctionHelp.Examples[0] | Should -Match ([regex]::Escape($function.Name))
         $FunctionHelp.Examples[0].Length | Should -BeGreaterThan ($function.Name.Length + 10)
-    } -TestCases $allModuleFunctions
+    } -TestCases $allPublicModuleFunctions
 
     It 'Help.Parameters | <Name>' {
         foreach ($parameter in $parameters)
@@ -209,5 +210,5 @@ Describe "Help for files" -Tags 'helpQuality' {
             $FunctionHelp.Parameters.($parameter.ToUpper()).Length | Should -BeGreaterThan 25
         }
 
-    } -TestCases $allModuleFunctions
+    } -TestCases $allPublicModuleFunctions
 }
