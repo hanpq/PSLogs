@@ -111,8 +111,6 @@ GitHubConfig:
     - "CHANGELOG.md"
   GitHubConfigUserName: hanpq
   GitHubConfigUserEmail: hannes.palmquist@outlook.com
-  ReleaseBranch: master
-  MainGitBranch: main
   UpdateChangelogOnPrerelease: false
   Docs:
     DocsRepo:

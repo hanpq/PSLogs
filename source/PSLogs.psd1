@@ -24,7 +24,7 @@
     AliasesToExport      = '*'
     PrivateData          = @{
         PSData = @{
-            LicenseUri               = 'https://github.com/hanpq/PSLogs/blob/master/LICENSE'
+            LicenseUri               = 'https://github.com/hanpq/PSLogs/blob/main/LICENSE'
             RequireLicenseAcceptance = $false
             Prerelease               = ''
             Tags                     = @('PSEdition_Desktop', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')

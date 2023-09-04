@@ -28,7 +28,7 @@ param
 
     [Parameter()]
     [string]
-    $ReleaseBranch = (property ReleaseBranch 'master'),
+    $ReleaseBranch = (property ReleaseBranch 'main'),
 
     [Parameter()]
     [string]
@@ -48,7 +48,7 @@ param
     $SkipPublish = (property SkipPublish ''),
 
     [Parameter()]
-    $MainGitBranch = (property MainGitBranch 'master')
+    $MainGitBranch = (property MainGitBranch 'main')
 )
 
 task Publish_release_to_GitHub -if ($GitHubToken -and (Get-Module -Name PowerShellForGitHub -ListAvailable)) {
@@ -80,9 +80,9 @@ task Publish_release_to_GitHub -if ($GitHubToken -and (Get-Module -Name PowerShe
     }
     else
     {
-        if (-not ($ReleaseNotes = (Get-Content -raw $ReleaseNotesPath -ErrorAction SilentlyContinue)))
+        if (-not ($ReleaseNotes = (Get-Content -Raw $ReleaseNotesPath -ErrorAction SilentlyContinue)))
         {
-            $ReleaseNotes = Get-Content -raw $ChangeLogPath -ErrorAction SilentlyContinue
+            $ReleaseNotes = Get-Content -Raw $ChangeLogPath -ErrorAction SilentlyContinue
         }
     }
 
@@ -93,7 +93,7 @@ task Publish_release_to_GitHub -if ($GitHubToken -and (Get-Module -Name PowerShe
 
     if (!$SkipPublish)
     {
-        Write-Build DarkGray "Publishing GitHub release:"
+        Write-Build DarkGray 'Publishing GitHub release:'
         Write-Build DarkGray ($releaseParams | Out-String)
 
         $getGHReleaseParams = @{
@@ -134,7 +134,7 @@ task Publish_release_to_GitHub -if ($GitHubToken -and (Get-Module -Name PowerShe
 
             Write-Build DarkGray "Creating new GitHub release '$ReleaseTag ' at '$remoteURL'."
             $APIResponse = New-GitHubRelease @releaseParams
-            Write-Build Green "Release Created. Adding Assets..."
+            Write-Build Green 'Release Created. Adding Assets...'
             if ((-not [string]::IsNullOrEmpty($PackageToRelease)) -and (Test-Path -Path $PackageToRelease))
             {
                 $APIResponse | New-GitHubReleaseAsset -Path $PackageToRelease -AccessToken $GitHubToken

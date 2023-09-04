@@ -240,7 +240,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed build script to release on powershelgallery only on master branch
+- Fixed build script to release on powershelgallery only on main branch
 
 ## [2.4.2] - 2017-01-10
 

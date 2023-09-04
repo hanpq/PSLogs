@@ -2,16 +2,16 @@
 on:
   workflow_dispatch:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - "source/**"
       - "tests/**"
   push:
     branches:
-      - master
+      - main
     tags-ignore:
       - "*-*"
     paths:
@@ -182,7 +182,7 @@ jobs:
       - Test_Linux_Core
       - Test_Windows_Core
       - Test_Windows_Desktop
-    if: ${{ success() && (github.ref == 'refs/heads/master' || StartsWith(github.ref,'refs/tags/')) }}
+    if: ${{ success() && (github.ref == 'refs/heads/main' || StartsWith(github.ref,'refs/tags/')) }}
     steps:
       - uses: actions/checkout@v3
         with:

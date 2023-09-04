@@ -28,7 +28,7 @@ param
 
     [Parameter()]
     [string]
-    $ReleaseBranch = (property ReleaseBranch 'master'),
+    $ReleaseBranch = (property ReleaseBranch 'main'),
 
     [Parameter()]
     [string]
@@ -48,10 +48,10 @@ param
     $SkipPublish = (property SkipPublish ''),
 
     [Parameter()]
-    $MainGitBranch = (property MainGitBranch 'master')
+    $MainGitBranch = (property MainGitBranch 'main')
 )
 
-Task Create_ChangeLog_GitHub_PR -if ($GitHubToken -and (Get-Module -name PowerShellForGitHub)) {
+Task Create_ChangeLog_GitHub_PR -if ($GitHubToken -and (Get-Module -Name PowerShellForGitHub)) {
     # # This is how AzDO setup the environment:
     # git init
     # git remote add origin https://github.com/gaelcolas/Sampler
