@@ -8,13 +8,13 @@ BeforeAll {
     $ProjectPath = $RootItem.FullName
     $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*\output\$($RootItem.Name)\*"
 
-    Remove-Module $ModuleManifestFileInfo.BaseName -Force -ErrorAction SilentlyContinue
+    Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 
-    Import-Module $ModuleManifestFileInfo.BaseName -Force
+    Import-Module $ModuleManifestFileInfo.FullName -Force
 }
 
 AfterAll {
-    Remove-Module $ModuleManifestFileInfo.BaseName -Force
+    Remove-Module PSLogs -Force
 }
 
 InModuleScope PSLogs {

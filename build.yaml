@@ -70,7 +70,7 @@ Pester:
       Tag:
       ExcludeTag:
     Output:
-      Verbosity: Diagnostic
+      Verbosity: Detailed
     #Debug:
     #  WriteDebugMessagesFrom: '*'
     CodeCoverage:
