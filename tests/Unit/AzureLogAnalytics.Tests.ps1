@@ -1,17 +1,12 @@
 ﻿BeforeAll {
 
     $RootItem = Get-Item $PSScriptRoot
-    Write-Host "RootItem is $($RootItem.FullName)"
     while ($RootItem.GetDirectories().Name -notcontains 'source')
     {
         $RootItem = $RootItem.Parent
     }
-    Write-Host "RootItem is $($RootItem.FullName)"
     $ProjectPath = $RootItem.FullName
-    Write-Host "ProjectPath is $ProjectPath"
-    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*\output\$($RootItem.Name)\*"
-    Write-Host "PSD Files found under ProjectPath `n $((Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1').FullName)"
-    Write-Host "ModuleManifestFileInfo is $($ModuleManifestFileINfo.FullName)"
+    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*$([IO.Path]::DirectorySeparatorChar)output$([IO.Path]::DirectorySeparatorChar)$($RootItem.Name)\*"
 
     Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 

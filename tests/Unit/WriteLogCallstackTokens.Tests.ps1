@@ -7,7 +7,7 @@ BeforeAll {
         $RootItem = $RootItem.Parent
     }
     $ProjectPath = $RootItem.FullName
-    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*\output\$($RootItem.Name)\*"
+    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*$([IO.Path]::DirectorySeparatorChar)output$([IO.Path]::DirectorySeparatorChar)$($RootItem.Name)\*"
 
     Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 
