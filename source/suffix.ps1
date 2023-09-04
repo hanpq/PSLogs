@@ -2,3 +2,5 @@
 Set-LoggingVariables
 
 Start-LoggingManager
+
+#Trigger build
