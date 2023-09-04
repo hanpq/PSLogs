@@ -14,7 +14,7 @@ BeforeAll {
 }
 
 AfterAll {
-    Remove-Module PSLogs -Force
+    Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 }
 
 InModuleScope PSLogs {

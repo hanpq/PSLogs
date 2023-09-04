@@ -17,7 +17,7 @@ BeforeAll {
 }
 
 AfterAll {
-    Remove-Module PSLogs -Force
+    Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 }
 
 # These tests verify that Write-Log determines the correct values for the tokens whose values are taken from

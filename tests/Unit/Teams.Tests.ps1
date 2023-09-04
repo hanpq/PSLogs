@@ -14,7 +14,7 @@
 }
 
 AfterAll {
-    Remove-Module PSLogs -Force
+    Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 }
 
 Describe -Skip:($true) -Tags Targets, TargetTeams 'Teams target' {
