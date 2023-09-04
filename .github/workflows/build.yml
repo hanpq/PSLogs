@@ -23,6 +23,8 @@ env:
   PFX_PASS: ${{ secrets.PFX_PASS }}
   PSTOOLS_APITOKEN: ${{ secrets.PSTOOLS_APITOKEN }}
   PSTOOLS_SOURCE: ${{ secrets.PSTOOLS_SOURCE }}
+  PSTOOLS_USER: ${{ secrets.PSTOOLS_USER }}
+  PSTOOLS_PASS: ${{ secrets.PSTOOLS_PASS }}
 
 jobs:
   Build:
@@ -180,7 +182,7 @@ jobs:
       - Test_Linux_Core
       - Test_Windows_Core
       - Test_Windows_Desktop
-    if: ${{ success() && (github.ref == 'refs/heads/' || StartsWith(github.ref,'refs/tags/')) }}
+    if: ${{ success() && (github.ref == 'refs/heads/master' || StartsWith(github.ref,'refs/tags/')) }}
     steps:
       - uses: actions/checkout@v3
         with:
