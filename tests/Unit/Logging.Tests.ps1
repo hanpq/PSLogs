@@ -1,37 +1,32 @@
-BeforeDiscovery {
+BeforeAll {
+
     $RootItem = Get-Item $PSScriptRoot
     while ($RootItem.GetDirectories().Name -notcontains 'source')
     {
         $RootItem = $RootItem.Parent
     }
     $ProjectPath = $RootItem.FullName
-    $PSDFile = (Get-ChildItem $ProjectPath\*\*.psd1 | Where-Object {
-            ($_.Directory.Name -eq 'source') -and
-            $(try
-                {
-                    Test-ModuleManifest $_.FullName -ErrorAction Stop
-                }
-                catch
-                {
-                    $false
-                })
-        }
-    )
+    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*\output\$($RootItem.Name)\*"
 
-    $ProjectName = $PSDFile.BaseName
+    Remove-Module $ModuleManifestFileInfo.BaseName -Force -ErrorAction SilentlyContinue
 
-    Import-Module $ProjectName -Force
-
+    Import-Module $ModuleManifestFileInfo.BaseName -Force
 }
 
-InModuleScope $ProjectName {
+AfterAll {
+    Remove-Module $ModuleManifestFileInfo.BaseName -Force
+}
+
+InModuleScope PSLogs {
     Describe -Tags Build 'Internal Vars' {
         It 'sets up internal variables' {
-            Test-Path Variable:Logging | Should -Be $true
-            Test-Path Variable:Defaults | Should -Be $true
-            Test-Path Variable:LevelNames | Should -Be $true
-            Test-Path Variable:LoggingRunspace | Should -Be $true
-            Test-Path Variable:LoggingEventQueue | Should -Be $true
+            InModuleScope PSLogs {
+                Test-Path Variable:Logging | Should -Be $true
+                Test-Path Variable:Defaults | Should -Be $true
+                Test-Path Variable:LevelNames | Should -Be $true
+                Test-Path Variable:LoggingRunspace | Should -Be $true
+                Test-Path Variable:LoggingEventQueue | Should -Be $true
+            }
         }
     }
 
@@ -240,8 +235,10 @@ InModuleScope $ProjectName {
 
     Describe -Tags Build 'Logging Producer-Consumer' {
         It 'should start logging manager after module import' {
-            Test-Path Variable:LoggingEventQueue | Should -Be $true
-            Test-Path Variable:LoggingRunspace | Should -Be $true
+            InModuleScope PSLogs {
+                Test-Path Variable:LoggingEventQueue | Should -Be $true
+                Test-Path Variable:LoggingRunspace | Should -Be $true
+            }
         }
     }
 }

@@ -89,7 +89,7 @@ function Start-LoggingManager
 
     #region Handle Module Removal
     $OnRemoval = {
-        $Module = Get-Module Logging
+        $Module = Get-Module PSLogs
 
         if ($Module)
         {

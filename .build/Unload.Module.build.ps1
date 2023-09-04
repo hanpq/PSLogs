@@ -29,6 +29,6 @@
 Task Unload_Module {
     . Set-SamplerTaskVariable
 
-    Remove-Module $ProjectName
+    Remove-Module $ProjectName -Force -ErrorAction SilentlyContinue
 
 }

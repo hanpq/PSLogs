@@ -1,25 +1,20 @@
-﻿BeforeDiscovery {
+﻿BeforeAll {
+
     $RootItem = Get-Item $PSScriptRoot
     while ($RootItem.GetDirectories().Name -notcontains 'source')
     {
         $RootItem = $RootItem.Parent
     }
     $ProjectPath = $RootItem.FullName
-    $ProjectName = (Get-ChildItem $ProjectPath\*\*.psd1 | Where-Object {
-            ($_.Directory.Name -eq 'source') -and
-            $(try
-                {
-                    Test-ModuleManifest $_.FullName -ErrorAction Stop
-                }
-                catch
-                {
-                    $false
-                })
-        }
-    ).BaseName
+    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*\output\$($RootItem.Name)\*"
 
-    Import-Module $ProjectName -Force
+    Remove-Module $ModuleManifestFileInfo.BaseName -Force -ErrorAction SilentlyContinue
 
+    Import-Module $ModuleManifestFileInfo.BaseName -Force
+}
+
+AfterAll {
+    Remove-Module $ModuleManifestFileInfo.BaseName -Force
 }
 
 Describe -Skip:($true) -Tags Targets, TargetTeams 'Teams target' {

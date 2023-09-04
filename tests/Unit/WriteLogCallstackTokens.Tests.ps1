@@ -1,28 +1,24 @@
+
 BeforeAll {
+
     $RootItem = Get-Item $PSScriptRoot
     while ($RootItem.GetDirectories().Name -notcontains 'source')
     {
         $RootItem = $RootItem.Parent
     }
     $ProjectPath = $RootItem.FullName
-    $PSDFile = (Get-ChildItem $ProjectPath\*\*.psd1 | Where-Object {
-            ($_.Directory.Name -eq 'source') -and
-            $(try
-                {
-                    Test-ModuleManifest $_.FullName -ErrorAction Stop
-                }
-                catch
-                {
-                    $false
-                })
-        }
-    )
-    $ProjectName = $PSDFile.BaseName
-    Import-Module $ProjectName -Force
+    $ModuleManifestFileInfo = Get-ChildItem $ProjectPath -Recurse -Filter '*.psd1' | Where-Object fullname -Like "*\output\$($RootItem.Name)\*"
 
-    $moduleManifestPath = (Get-ChildItem "$ProjectPath\output\" -Filter $PSDFile.Name -Recurse).FullName
+    Remove-Module $ModuleManifestFileInfo.BaseName -Force -ErrorAction SilentlyContinue
+
+    Import-Module $ModuleManifestFileInfo.BaseName -Force
+
+    $moduleManifestPath = $ModuleManifestFileInfo.FullName
 }
 
+AfterAll {
+    Remove-Module $ModuleManifestFileInfo.BaseName -Force
+}
 
 # These tests verify that Write-Log determines the correct values for the tokens whose values are taken from
 # the callstack: 'pathname', 'filename', 'lineno', and 'caller'.
@@ -41,7 +37,7 @@ BeforeAll {
 # Accordingly, these tests use Pester to create scripts that call Write-Log, and then run those scripts using
 # the PowerShell executable, instead of calling Write-Log from directly within the tests. These tests will run
 # relatively slowly as a result of this.
-Describe 'CallerScope' -Skip:($true) {
+Describe 'CallerScope' {
     BeforeAll {
         # Set to $true to enable output of additional debugging information for this test code.
         $debugTests = $false
@@ -60,7 +56,6 @@ Describe 'CallerScope' -Skip:($true) {
         $codeLineWriteLog = "Write-Log -Message 'Test Message';"
         $codeLineWaitForFile = "while (-not (Test-Path -Path '$logpath')) {};"
         $codeLineRemoveModule = 'Remove-Module -Name PSLogs;'
-        $codeLineExit = '[system.environment]::Exit(0)'
 
         $codeSetup = @(
             $codeLineImportModule
@@ -70,7 +65,6 @@ Describe 'CallerScope' -Skip:($true) {
         $codeCleanup = @(
             $codeLineWaitForFile
             $codeLineRemoveModule
-            $codeLineExit
         )
 
         function InvokePowerShellExe
@@ -107,7 +101,7 @@ Describe 'CallerScope' -Skip:($true) {
                 ArgumentList = @('-NoLogo', '-NoProfile', '-NonInteractive', $run)
             }
 
-            $Proc = Start-Process @params
+            Start-Process @params
         }
 
         # Reads through an array of code lines to determine which one contains the line that calls
