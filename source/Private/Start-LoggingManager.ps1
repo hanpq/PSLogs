@@ -89,9 +89,15 @@ function Start-LoggingManager
 
     #region Handle Module Removal
     $OnRemoval = {
+        $Module = Get-Module PSLogs
 
-        Wait-Logging
-        Stop-LoggingManager
+        if ($Module)
+        {
+            $Mod.Invoke({
+                    Wait-Logging
+                    Stop-LoggingManager
+                })
+        }
 
         [System.GC]::Collect()
     }
