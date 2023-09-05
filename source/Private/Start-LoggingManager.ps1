@@ -93,7 +93,7 @@ function Start-LoggingManager
 
         if ($Module)
         {
-            $Mod.Invoke({
+            $Module.Invoke({
                     Wait-Logging
                     Stop-LoggingManager
                 })
