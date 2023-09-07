@@ -13,21 +13,39 @@ function Set-LoggingVariables
 
     $Script:NOTSET = 0
     $Script:DEBUG = 10
+    $Script:VERBOSE = 14
     $Script:INFO = 20
+    $Script:NOTICE = 24
+    $Script:SUCCESS = 26
     $Script:WARNING = 30
     $Script:ERROR_ = 40
+    $Script:CRITIAL = 50
+    $Script:ALERT = 60
+    $Script:EMERGENCY = 70
 
     New-Variable -Name LevelNames           -Scope Script -Option ReadOnly -Value ([hashtable]::Synchronized(@{
-                $NOTSET   = 'NOTSET'
-                $ERROR_   = 'ERROR'
-                $WARNING  = 'WARNING'
-                $INFO     = 'INFO'
-                $DEBUG    = 'DEBUG'
-                'NOTSET'  = $NOTSET
-                'ERROR'   = $ERROR_
-                'WARNING' = $WARNING
-                'INFO'    = $INFO
-                'DEBUG'   = $DEBUG
+                $NOTSET     = 'NOTSET'
+                $ERROR_     = 'ERROR'
+                $WARNING    = 'WARNING'
+                $INFO       = 'INFO'
+                $DEBUG      = 'DEBUG'
+                $VERBOSE    = 'VERBOSE'
+                $NOTICE     = 'NOTICE'
+                $SUCCESS    = 'SUCCESS'
+                $CRITIAL    = 'CRITICAL'
+                $ALERT      = 'ALERT'
+                $EMERGENCY  = 'EMERGENCY'
+                'NOTSET'    = $NOTSET
+                'ERROR'     = $ERROR_
+                'WARNING'   = $WARNING
+                'INFO'      = $INFO
+                'DEBUG'     = $DEBUG
+                'VERBOSE'   = $VERBOSE
+                'NOTICE'    = $NOTICE
+                'SUCCESS'   = $SUCCESS
+                'CRITIAL'   = $CRITICAL
+                'ALERT'     = $ALERT
+                'EMERGENCY' = $EMERGENCY
             }))
 
     New-Variable -Name ScriptRoot           -Scope Script -Option ReadOnly -Value ([System.IO.Path]::GetDirectoryName($MyInvocation.MyCommand.Module.Path))
