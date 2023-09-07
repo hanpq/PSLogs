@@ -96,7 +96,7 @@ InModuleScope PSLogs {
 
     Describe -Tags Build 'Logging Levels' {
         It 'should return logging levels names' {
-            Get-LevelsName | Should -Be @('DEBUG', 'ERROR', 'INFO', 'NOTSET', 'WARNING')
+            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'VERBOSE', 'WARNING')
         }
 
         It 'should return loggin level name' {
@@ -116,17 +116,17 @@ InModuleScope PSLogs {
 
         It 'should add a new logging level' {
             Add-LoggingLevel -Level 11 -LevelName 'Test'
-            Get-LevelsName | Should -Be @('DEBUG', 'ERROR', 'INFO', 'NOTSET', 'TEST', 'WARNING')
+            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'TEST', 'VERBOSE', 'WARNING')
         }
 
         It 'should change the level name if same level number' {
             Add-LoggingLevel -Level 11 -LevelName 'Foo'
-            Get-LevelsName | Should -Be @('DEBUG', 'ERROR', 'FOO', 'INFO', 'NOTSET', 'WARNING')
+            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'FOO', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'VERBOSE', 'WARNING')
         }
 
         It 'should change the level number if same level name' {
             Add-LoggingLevel -Level 21 -LevelName 'Foo'
-            Get-LevelsName | Should -Be @('DEBUG', 'ERROR', 'FOO', 'INFO', 'NOTSET', 'WARNING')
+            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'FOO', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'VERBOSE', 'WARNING')
             Get-LevelNumber -Level 'FOO' | Should -Be 21
         }
 
