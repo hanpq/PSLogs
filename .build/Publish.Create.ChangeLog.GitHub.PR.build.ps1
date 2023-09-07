@@ -113,18 +113,26 @@ Task Create_ChangeLog_GitHub_PR -if ($GitHubToken -and (Get-Module -Name PowerSh
     {
         Write-Build DarkGray 'Updating Changelog file'
         Update-Changelog -ReleaseVersion ($TagVersion -replace '^v') -LinkMode None -Path $ChangelogPath -ErrorAction SilentlyContinue
+        Write-Build DarkGray 'Staging changelog...'
         git add $GitHubFilesToAdd
+        Write-Build DarkGray 'Committing changelog...'
         git commit -m "Updating ChangeLog since $TagVersion +semver:skip"
 
         $remoteURL = [URI](git remote get-url origin)
+        Write-Build DarkGray "Origin Remote URL is: $RemoteURL"
+        Write-Build DarkGray 'RetreivingRepoOwner...'
         $repoInfo = Get-GHOwnerRepoFromRemoteUrl -RemoteUrl $remoteURL
+
+        Write-Build DarkGray "RepoInfo: $($repoinfo | ConvertTo-Json -Depth 10 -Compress)"
 
         $URI = $remoteURL.Scheme + [URI]::SchemeDelimiter + $GitHubToken + '@' + $remoteURL.Authority + $remoteURL.PathAndQuery
 
         # Update the PUSH URI to use the Personal Access Token for Auth
+        Write-Build DarkGray 'Setting origin URI to include access token'
         git remote set-url --push origin $URI
 
         # track this branch on the remote 'origin
+        Write-Build DarkGray 'Push branch to remote...'
         git push -u origin $BranchName
 
         $NewPullRequestParams = @{
@@ -138,6 +146,7 @@ Task Create_ChangeLog_GitHub_PR -if ($GitHubToken -and (Get-Module -Name PowerSh
             MaintainerCanModify = $true
         }
 
+        Write-Build DarkGray 'Creating pull request...'
         $Response = New-GitHubPullRequest @NewPullRequestParams
         Write-Build Green "`n --> PR #$($Response.number) opened: $($Response.url)"
 
@@ -149,6 +158,7 @@ Task Create_ChangeLog_GitHub_PR -if ($GitHubToken -and (Get-Module -Name PowerSh
                 Authorization = "Bearer $GitHubToken"
             }
         }
+        Write-Build DarkGray 'Mergin PR...'
         $MergeResult = Invoke-RestMethod @MergePR
         if ($mergeresult.merged)
         {
