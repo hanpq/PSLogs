@@ -6,10 +6,16 @@
         Format         = @{Required = $false; Type = [string]; Default = $Logging.Format }
         PrintException = @{Required = $false; Type = [bool]; Default = $true }
         ColorMapping   = @{Required = $false; Type = [hashtable]; Default = @{
-                'DEBUG'   = 'Blue'
-                'INFO'    = 'Green'
-                'WARNING' = 'Yellow'
-                'ERROR'   = 'Red'
+                'DEBUG'     = 'Cyan'
+                'INFO'      = 'DarkGray'
+                'WARNING'   = 'Yellow'
+                'ERROR'     = 'Red'
+                'NOTICE'    = 'Gray'
+                'VERBOSE'   = 'Yellow'
+                'SUCCESS'   = 'Green'
+                'CRITICAL'  = 'Red'
+                'ALERT'     = 'Red'
+                'EMERGENCY' = 'Magenta'
             }
         }
     }
@@ -18,10 +24,12 @@
             [hashtable] $Configuration
         )
 
-        foreach ($Level in $Configuration.ColorMapping.Keys) {
+        foreach ($Level in $Configuration.ColorMapping.Keys)
+        {
             $Color = $Configuration.ColorMapping[$Level]
 
-            if ($Color -notin ([System.Enum]::GetNames([System.ConsoleColor]))) {
+            if ($Color -notin ([System.Enum]::GetNames([System.ConsoleColor])))
+            {
                 $ParentHost.UI.WriteErrorLine("ERROR: Cannot use custom color '$Color': not a valid [System.ConsoleColor] value")
                 continue
             }
@@ -33,28 +41,33 @@
             [hashtable] $Configuration
         )
 
-        try {
+        try
+        {
             $logText = Format-Pattern -Pattern $Configuration.Format -Source $Log
 
-            if (![String]::IsNullOrWhiteSpace($Log.ExecInfo) -and $Configuration.PrintException) {
+            if (![String]::IsNullOrWhiteSpace($Log.ExecInfo) -and $Configuration.PrintException)
+            {
                 $logText += "`n{0}" -f $Log.ExecInfo.Exception.Message
-                $logText += "`n{0}" -f (($Log.ExecInfo.ScriptStackTrace -split "`r`n" | %{"`t{0}" -f $_}) -join "`n")
+                $logText += "`n{0}" -f (($Log.ExecInfo.ScriptStackTrace -split "`r`n" | ForEach-Object { "`t{0}" -f $_ }) -join "`n")
             }
 
             $mtx = New-Object System.Threading.Mutex($false, 'ConsoleMtx')
             [void] $mtx.WaitOne()
 
-            if ($Configuration.ColorMapping.ContainsKey($Log.Level)) {
+            if ($Configuration.ColorMapping.ContainsKey($Log.Level))
+            {
                 $ParentHost.UI.WriteLine($Configuration.ColorMapping[$Log.Level], $ParentHost.UI.RawUI.BackgroundColor, $logText)
             }
-            else {
+            else
+            {
                 $ParentHost.UI.WriteLine($logText)
             }
 
             [void] $mtx.ReleaseMutex()
             $mtx.Dispose()
         }
-        catch {
+        catch
+        {
             $ParentHost.UI.WriteErrorLine($_)
         }
     }
