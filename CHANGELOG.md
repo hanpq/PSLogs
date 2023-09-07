@@ -5,6 +5,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New logging levels added; notice, verbose, success, critical, alert and emergency.
+
+### Changed
+
+- Default coloring/icons has been updated to accomodate differentiation for the new logging levels.
+
+## [5.0.1] - 2023-09-05
+
 ### Fixed
 
 - Fixed an issue where the logging manager was not always disposed when the module was removed.
