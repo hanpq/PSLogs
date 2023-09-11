@@ -19,7 +19,7 @@ function Set-LoggingVariables
     $Script:SUCCESS = 26
     $Script:WARNING = 30
     $Script:ERROR_ = 40
-    $Script:CRITIAL = 50
+    $Script:CRITICAL = 50
     $Script:ALERT = 60
     $Script:EMERGENCY = 70
 
@@ -32,7 +32,7 @@ function Set-LoggingVariables
                 $VERBOSE    = 'VERBOSE'
                 $NOTICE     = 'NOTICE'
                 $SUCCESS    = 'SUCCESS'
-                $CRITIAL    = 'CRITICAL'
+                $CRITICAL   = 'CRITICAL'
                 $ALERT      = 'ALERT'
                 $EMERGENCY  = 'EMERGENCY'
                 'NOTSET'    = $NOTSET
@@ -43,7 +43,7 @@ function Set-LoggingVariables
                 'VERBOSE'   = $VERBOSE
                 'NOTICE'    = $NOTICE
                 'SUCCESS'   = $SUCCESS
-                'CRITIAL'   = $CRITICAL
+                'CRITICAL'  = $CRITICAL
                 'ALERT'     = $ALERT
                 'EMERGENCY' = $EMERGENCY
             }))
