@@ -5,10 +5,10 @@ This target can be used to insert rows into a SQLite table
 Parameters:
     - Database: Defines the path to the SQLite database
     - TableName: Defines the name of the table to insert rows to
-    - ColumnMapping: Defines what log values should be written to witch columns in the table. See the ColumnMapping section below for more information.
+    - ColumnMapping: Defines what log values should be written to which columns in the table. See the ColumnMapping section below for more information.
     - Level: Defines the level of messages that will be sent to target.
     - MessageFormat: Defines the format of the message. A separate message format is used because it is unlikely that the message for the message column
-        should used the same format as specified in the default format of the module. And that format is overriding the default format specified in
+        should use the same format as specified in the default format of the module. And that format is overriding the default format specified in
         the target definition file.
     - PrintException: Defines that (if provided) the exception object is to be appended to the end of the message.
 
