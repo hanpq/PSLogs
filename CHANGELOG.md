@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Typos in comment based help fixed.
+- Fixed typo on critical logging level defintion.
 
 ## [5.0.3] - 2023-09-07
 
