@@ -5,6 +5,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.0] - 2023-09-11
+
 ### Added
 
 - Added configuration parameters to console plugin to only colorize level. This is false by default.
