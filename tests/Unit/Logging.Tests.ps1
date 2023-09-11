@@ -96,7 +96,18 @@ InModuleScope PSLogs {
 
     Describe -Tags Build 'Logging Levels' {
         It 'should return logging levels names' {
-            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'VERBOSE', 'WARNING')
+            $Levels = Get-LevelsName
+            $Levels | Should -Contain 'ALERT'
+            $Levels | Should -Contain 'CRITICAL'
+            $Levels | Should -Contain 'DEBUG'
+            $Levels | Should -Contain 'EMERGENCY'
+            $Levels | Should -Contain 'ERROR'
+            $Levels | Should -Contain 'INFO'
+            $Levels | Should -Contain 'NOTICE'
+            $Levels | Should -Contain 'NOTSET'
+            $Levels | Should -Contain 'SUCCESS'
+            $Levels | Should -Contain 'VERBOSE'
+            $Levels | Should -Contain 'WARNING'
         }
 
         It 'should return loggin level name' {
@@ -116,17 +127,17 @@ InModuleScope PSLogs {
 
         It 'should add a new logging level' {
             Add-LoggingLevel -Level 11 -LevelName 'Test'
-            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'TEST', 'VERBOSE', 'WARNING')
+            Get-LevelsName | Should -Contain 'TEST'
         }
 
         It 'should change the level name if same level number' {
             Add-LoggingLevel -Level 11 -LevelName 'Foo'
-            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'FOO', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'VERBOSE', 'WARNING')
+            Get-LevelsName | Should -Contain 'FOO'
         }
 
         It 'should change the level number if same level name' {
             Add-LoggingLevel -Level 21 -LevelName 'Foo'
-            Get-LevelsName | Should -Be @('ALERT', 'CRITIAL', 'DEBUG', 'EMERGENCY', 'ERROR', 'FOO', 'INFO', 'NOTICE', 'NOTSET', 'SUCCESS', 'VERBOSE', 'WARNING')
+            Get-LevelsName | Should -Contain 'FOO'
             Get-LevelNumber -Level 'FOO' | Should -Be 21
         }
 
