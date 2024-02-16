@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Improved API call to SEQ so that log arguments are parsed correctly. [PR #3] (Thanks to @in-voker)
+
 ## [5.1.0] - 2023-09-11
 
 ### Added
