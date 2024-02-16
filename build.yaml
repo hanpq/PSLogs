@@ -25,7 +25,6 @@ ModuleBuildTasks:
   Sampler.GitHubTasks:
     - "*.ib.tasks"
 
-
 BuildWorkflow:
   ".":
     - build
@@ -36,7 +35,6 @@ BuildWorkflow:
     - Build_ModuleOutput_ModuleBuilder
     - Build_NestedModules_ModuleBuilder
     - Create_changelog_release_output
-    #- Sign_Module
 
   pack:
     - build
