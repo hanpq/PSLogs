@@ -161,7 +161,7 @@ jobs:
           name: CodeCoverage_Windows_Desktop
           path: output/testResults/
       - name: Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           name: civoShell
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -203,7 +203,7 @@ jobs:
       - Deploy
       - Publish_Code_Coverage
     steps:
-      - uses: geekyeggo/delete-artifact@v2
+      - uses: geekyeggo/delete-artifact@v4
         with:
           name: |
             CodeCov*
