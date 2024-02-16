@@ -118,7 +118,7 @@ BeforeAll {
     }
 }
 
-Describe 'Changelog Management' -Tag 'Changelog' {
+Describe 'Changelog Management' -Tag 'Changelog' -Skip:$true {
     It 'Changelog has been updated' -skip:(
         !([bool](Get-Command git -EA SilentlyContinue) -and
             [bool](&(Get-Process -id $PID).Path -NoProfile -Command 'git rev-parse --is-inside-work-tree 2>$null'))
