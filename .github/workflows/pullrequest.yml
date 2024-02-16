@@ -126,6 +126,11 @@ jobs:
     name: Cleanup
     runs-on: ubuntu-latest
     if: ${{ always() }}
+    needs:
+      - Test_Linux_Core
+      - Test_Windows_Core
+      - Test_Windows_Desktop
+      - Test_MacOS_Core
     steps:
       - uses: geekyeggo/delete-artifact@v2
         with:
