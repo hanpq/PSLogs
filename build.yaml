@@ -48,6 +48,9 @@ BuildWorkflow:
     - Convert_Pester_Coverage
     - Pester_if_Code_Coverage_Under_Threshold
 
+  merge:
+    - Merge_CodeCoverage_Files
+
   publish:
     - Create_ChangeLog_GitHub_PR
     - Update_GetPSDev_Docs
@@ -75,7 +78,7 @@ Pester:
       Path:
       OutputFormat:
       CoveragePercentTarget: 1
-      OutputPath: CodeCov.xml
+      #OutputPath: CodeCov.xml
       OutputEncoding: ascii
       ExcludeTests:
     TestResult:
