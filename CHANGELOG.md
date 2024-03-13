@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- When logging to email, body will now preserve formatting of the json object in the final message. Previously the json was concatinated into one single line and no linefeeds/carrage returns were kept. Indentation with space is now also perserved in the mail message.
+
 ## [5.2.0] - 2024-02-16
 
 ### Fixed

@@ -21,10 +21,11 @@
 
         $Body = '<h3>{0}</h3>' -f $Log.Message
 
-        if (![String]::IsNullOrWhiteSpace($Log.ExecInfo)) {
+        if (![String]::IsNullOrWhiteSpace($Log.ExecInfo))
+        {
             $Body += '<pre>'
             $Body += "`n{0}" -f $Log.ExecInfo.Exception.Message
-            $Body += "`n{0}" -f (($Log.ExecInfo.ScriptStackTrace -split "`r`n" | % { "`t{0}" -f $_ }) -join "`n")
+            $Body += "`n{0}" -f (($Log.ExecInfo.ScriptStackTrace -split "`r`n" | ForEach-Object { "`t{0}" -f $_ }) -join "`n")
             $Body += '</pre>'
         }
 
@@ -39,12 +40,21 @@
             BodyAsHtml = $true
         }
 
-        if ($Configuration.Credential) {
+        if ($Configuration.Credential)
+        {
             $Params['Credential'] = $Configuration.Credential
         }
 
-        if ($Log.Body) {
-            $Params.Body += "`n`n{0}" -f ($Log.Body | ConvertTo-Json)
+        if ($Log.Body)
+        {
+            # Previously the json was inserted on a single line. By splitting up the json
+            # string into rows and adding <br> we can persist linebreaks in the email
+            # message. We also replace spaces with a HTML token for space. This is also
+            # stripped in the final email message.
+            $Params.Body += "`n`n"
+            ($Log.Body | ConvertTo-Json).Split("`n") | ForEach-Object {
+                $Params.Body += "$PSItem<br>".Replace(' ', '&nbsp;')
+            }
         }
 
         Send-MailMessage @Params
