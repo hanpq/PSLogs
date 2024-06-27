@@ -89,8 +89,6 @@
             )
         }
 
-        $Body | ConvertTo-Json -Depth 5 | Out-File -FilePath C:\test.json
-
         if ($Configuration.ApiKey) {
             $Url = '{0}/api/events/raw?apiKey={1}' -f $Configuration.Url, $Configuration.ApiKey
         }
