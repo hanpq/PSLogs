@@ -81,10 +81,21 @@ Columnmapping:
 
         $ColumnString = $Configuration.ColumnMapping.Keys -join ','
         $ValueString = ($Configuration.ColumnMapping.Keys -as [string[]]).Foreach({ '@' + $_ }) -join ','
+
+        foreach ($Key in $Log.Body.Keys)
+        {
+            $ColumnString += ',' + $Key
+            $ValueString += ',' + '@' + $Key
+        }
+
         $ColumnHash = @{}
         foreach ($Key in $Configuration.ColumnMapping.Keys)
         {
             $ColumnHash.Add($Key, $Log.$($Configuration.ColumnMapping[$Key]))
+        }
+        foreach ($Key in $Log.Body.Keys)
+        {
+            $ColumnHash.Add($Key, $Log.Body[$Key])
         }
 
         $query = "INSERT INTO $($Configuration.TableName) ($ColumnString) VALUES ($ValueString)"

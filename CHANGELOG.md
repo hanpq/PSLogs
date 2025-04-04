@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plugin SQLite: Logging now supports custom columns and values.
+
 ## [5.2.2] - 2024-06-27
 
 ### Fixed

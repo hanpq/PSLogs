@@ -189,40 +189,6 @@ The _Targets_ property stores the used logging targets, it's where you define wh
 
 Keys of the hashtable depends on the target you are configuring. The module ships with 7 targets but you can write your own for specific usage.
 
-- [PSLogs](#pslogs)
-  - [Project status](#project-status)
-  - [About](#about)
-  - [Installation](#installation)
-    - [PowerShell Gallery](#powershell-gallery)
-- [Usage](#usage)
-  - [TL;DR](#tldr)
-    - [NOTE](#note)
-  - [Configuration](#configuration)
-    - [Level](#level)
-    - [Format](#format)
-      - [Padding](#padding)
-      - [Date format string](#date-format-string)
-      - [Caller](#caller)
-    - [Targets](#targets)
-      - [Console](#console)
-        - [Colors](#colors)
-      - [File](#file)
-        - [Rotation](#rotation)
-      - [ElasticSearch](#elasticsearch)
-        - [NoFlatten](#noflatten)
-        - [Flatten](#flatten)
-      - [Slack](#slack)
-      - [Email](#email)
-      - [Seq](#seq)
-      - [WinEventLog](#wineventlog)
-      - [Teams](#teams)
-    - [CustomTargets](#customtargets)
-      - [AzureLogAnalytics](#azureloganalytics)
-  - [Contributing](#contributing)
-  - [Notes](#notes)
-  - [License](#license)
-  - [Included attributions from orginal repo](#included-attributions-from-orginal-repo)
-
 #### Console
 
 From version 2.3.3 it supports acquiring lock for issues with git prompt that sometimes gets splitted during output.
@@ -419,6 +385,63 @@ Write-Log -Level 'WARNING' -Message 'Hello, {0}!' -Arguments 'Powershell' -Body 
 Write-Log -Level 'WARNING' -Message 'Hello, Powershell'
 Write-Log -Level 'WARNING' -Message 'Hello, {0}!' -Arguments 'Powershell'
 Write-Log -Level 'WARNING' -Message 'Hello, {0}!' -Arguments 'Powershell' -Body @{source = 'Logging'}
+```
+
+#### SQLite
+
+Using column mapping the following values can be used out-of-the-box 
+
+- pathname
+- pid
+- body
+- timestamp
+- rawmessage
+- lineno
+- filename
+- caller
+- level
+- timestamputc
+- execinfo
+- message
+- levelno
+
+The key of the ColumnMapping hashtable is the SQL Table column name and the value is one of the above properties.
+
+```powershell
+Add-LoggingTarget -Name SQLite -Configuration @{
+    Database      = "$PSScriptRoot\Logs.sqlite"
+    TableName     = 'Logs'
+    ColumnMapping = @{
+        Timestamp = 'Timestamp'
+        Severity  = 'Level'
+        Source    = 'Caller'
+        Message   = 'Message'
+    }
+    Level         = 'debug'
+}
+
+Write-Log -Level 'WARNING' -Message 'Hello, Powershell'
+Write-Log -Level 'WARNING' -Message 'Hello, {0}!' -Arguments 'Powershell'
+```
+
+You can also provide custom values for the logging table by providing a hashtable to the Body parameter. Make sure that the table actually has the columns before trying to log them.
+
+```powershell
+Write-Log -Level 'WARNING' -Message 'Hello' -Body @{PSEdition = $PSEdition}
+```
+When you have the dependency module PSSQLite installed you can use the following command to initialize a SQLite database for logging. Modify appropriately
+
+```powershell
+$Query = @'
+CREATE TABLE "Logs" (
+	"Timestamp"	DATETIME NOT NULL,
+	"Severity"	TEXT NOT NULL,
+	"Source"	TEXT NOT NULL,
+	"Message"	TEXT NOT NULL,
+	"PSEdition"	TEXT
+);
+'@
+Invoke-SqliteQuery -DataSource C:\Path\To\logs2.sqlite -Query $Query
 ```
 
 #### WinEventLog
