@@ -5,6 +5,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plugin File: Now supports option for short level names (3 char). Makes output better aligned and easier to read.
+- Plugin Console: Now supports option for short level names (3 char). Makes output better aligned and easier to read.
+
 ## [5.2.3] - 2025-04-04
 
 ### Added

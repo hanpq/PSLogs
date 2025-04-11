@@ -19,6 +19,7 @@
             }
         }
         OnlyColorizeLevel = @{Required = $false; Type = [bool]; Default = $false }
+        ShortLevel        = @{Required = $false; Type = [bool]; Default = $false }
     }
     Init          = {
         param(
@@ -61,6 +62,11 @@
                 Magenta     = '255;0;255'
                 Yellow      = '255;255;0'
                 White       = '255;255;255'
+            }
+
+            if ($Configuration.ShortLevel)
+            {
+                $Log.Level = $Log.Level.ToString().Substring(0, 3)
             }
 
             $logText = Format-Pattern -Pattern $Configuration.Format -Source $Log
