@@ -5,17 +5,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plugin Console: Now supports SQL logging level
+
+### Chore
+
+- Updated README / GetStarted docs
+
 ## [5.2.4] - 2025-04-11
 
 ### Added
 
 - Plugin File: Now supports option for short level names (3 char). Makes output better aligned and easier to read.
 - Plugin Console: Now supports option for short level names (3 char). Makes output better aligned and easier to read.
-- Plugin Console: Now supports SQL logging level
-
-### Chore
-
-- Updated README / GetStarted docs
 
 ## [5.2.3] - 2025-04-04
 
