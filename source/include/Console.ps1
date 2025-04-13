@@ -6,6 +6,7 @@
         Format            = @{Required = $false; Type = [string]; Default = $Logging.Format }
         PrintException    = @{Required = $false; Type = [bool]; Default = $true }
         ColorMapping      = @{Required = $false; Type = [hashtable]; Default = @{
+                'SQL'       = 'Magenta'
                 'DEBUG'     = 'Cyan'
                 'INFO'      = 'DarkGray'
                 'WARNING'   = 'Yellow'

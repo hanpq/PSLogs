@@ -12,6 +12,7 @@ function Set-LoggingVariables
     Write-Verbose -Message 'Setting up vars'
 
     $Script:NOTSET = 0
+    $Script:SQL = 5
     $Script:DEBUG = 10
     $Script:VERBOSE = 14
     $Script:INFO = 20
@@ -35,6 +36,7 @@ function Set-LoggingVariables
                 $CRITICAL   = 'CRITICAL'
                 $ALERT      = 'ALERT'
                 $EMERGENCY  = 'EMERGENCY'
+                $SQL        = 'SQL'
                 'NOTSET'    = $NOTSET
                 'ERROR'     = $ERROR_
                 'WARNING'   = $WARNING
@@ -46,6 +48,7 @@ function Set-LoggingVariables
                 'CRITICAL'  = $CRITICAL
                 'ALERT'     = $ALERT
                 'EMERGENCY' = $EMERGENCY
+                'SQL'       = $SQL
             }))
 
     New-Variable -Name ScriptRoot           -Scope Script -Option ReadOnly -Value ([System.IO.Path]::GetDirectoryName($MyInvocation.MyCommand.Module.Path))
