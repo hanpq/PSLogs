@@ -64,12 +64,11 @@
                 Yellow      = '255;255;0'
                 White       = '255;255;255'
             }
-
+            $OriginalLogLevel = $Log.Level
             if ($Configuration.ShortLevel)
             {
                 $Log.Level = $Log.Level.ToString().Substring(0, 3)
             }
-
             $logText = Format-Pattern -Pattern $Configuration.Format -Source $Log
 
             if (![String]::IsNullOrWhiteSpace($Log.ExecInfo) -and $Configuration.PrintException)
@@ -81,16 +80,16 @@
             $mtx = New-Object System.Threading.Mutex($false, 'ConsoleMtx')
             [void] $mtx.WaitOne()
 
-            if ($Configuration.ColorMapping.ContainsKey($Log.Level))
+            if ($Configuration.ColorMapping.ContainsKey($OriginalLogLevel))
             {
                 if ($Configuration.OnlyColorizeLevel)
                 {
-                    $logtext = $logtext.replace($log.level, "`e[38;2;$($ConsoleColors.$($Configuration.ColorMapping[$Log.Level]))m$($log.level)`e[0m")
+                    $logtext = $logtext.replace($log.level, "`e[38;2;$($ConsoleColors.$($Configuration.ColorMapping[$OriginalLogLevel]))m$($log.level)`e[0m")
                     $ParentHost.UI.WriteLine($logtext)
                 }
                 else
                 {
-                    $ParentHost.UI.WriteLine($Configuration.ColorMapping[$Log.Level], $ParentHost.UI.RawUI.BackgroundColor, $logText)
+                    $ParentHost.UI.WriteLine($Configuration.ColorMapping[$OriginalLogLevel], $ParentHost.UI.RawUI.BackgroundColor, $logText)
                 }
             }
             else

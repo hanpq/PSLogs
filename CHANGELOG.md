@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Plugin Console: Fixed an issue where ShortLevel would cause default colors to not apply.
+
 ## [5.2.5] - 2025-04-13
 
 ### Added
