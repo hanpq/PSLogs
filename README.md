@@ -488,7 +488,7 @@ Write-Log -Level 'WARNING' -Message 'Hello, Powershell!' -Body $Body
 | Database       | String    |    Yes    | N/A                                                                              | Set the database file path                                       |
 | TableName      | String    |    Yes    | N/A                                                                              | Set the table name the logs should be inserted to.               |
 | ColumnMapping  | Hashtable |    No     | Timestamp = 'Timestamp'; Level = 'Level'; Source = 'Caller'; Message = 'Message' | Overrides what built-in values should be inserted into the table |
-| MessageFormat  | String    |    No     | '[%{lineno}] %{message}'                                                         | Override the message format                                      |
+| MessageFormat  | String    |    No     |                                                                                  | Override the message format                                      |
 | PrintException | Boolean   |    No     | $false                                                                           | Append the exception and stackstrace to the message              |
 
 #### Example
