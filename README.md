@@ -262,6 +262,9 @@ Add-LoggingTarget -Name Console -Configuration @{
 }
 ```
 
+#### Format examples
+![Logging Formats](https://raw.githubusercontent.com/hanpq/PSLogs/refs/heads/main/.build/LoggingFormats.png)
+
 ### File
 
 #### Configuration options
