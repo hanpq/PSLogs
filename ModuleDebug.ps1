@@ -3,6 +3,9 @@ Import-Module 'D:\Repos\PSLogs\output\PSLogs' -Force
 
 function Log
 {
+    param (
+        [switch]$FormatColor = $false
+    )
     $Level = @(
         'ERROR',
         'WARNING',
@@ -18,8 +21,14 @@ function Log
     )
     foreach ($i in 1..3)
     {
-        #Write-Log -Level ($Level | Get-Random) -Message "Message {StartColor:Yellow}$i{EndColor}"
-        Write-Log -Level ($Level | Get-Random) -Message "Message $i"
+        if ($FormatColor)
+        {
+            Write-Log -Level ($Level | Get-Random) -Message "Message {StartColor:Yellow}$i{EndColor}"
+        }
+        else
+        {
+            Write-Log -Level ($Level | Get-Random) -Message "Message $i"
+        }
     }
 }
 
@@ -66,7 +75,16 @@ Add-LoggingTarget -Name Console -Configuration @{
     OnlyColorizeLevel = $true
     Format            = '%{timestamp:+yyyy-MM-dd HH:mm:ss} | %{level:-7} | %{message}'
 }
-Log
+Log -FormatColor
+Wait-Logging
+
+Write-Host "`nDelimited with | and static level length and colorize level ('%{timestamp:+yyyy-MM-dd HH:mm:ss} | %{level:-7} | %{message}')"
+Add-LoggingTarget -Name Console -Configuration @{
+    ShortLevel        = $false
+    OnlyColorizeLevel = $true
+    Format            = '{StartColor:Blue}%{timestamp:+yyyy-MM-dd HH:mm:ss}{EndColor} | %{level:-7} | %{message}'
+}
+Log -FormatColor
 Wait-Logging
 
 
