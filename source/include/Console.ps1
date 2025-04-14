@@ -44,6 +44,70 @@
             [hashtable] $Configuration
         )
 
+        function Get-RgbFromConsoleColor
+        {
+            param (
+                [Parameter(Mandatory)]
+                [System.ConsoleColor]$ConsoleColor
+            )
+
+            $colorMap = @{
+                Black       = [System.Drawing.Color]::FromArgb(0, 0, 0)
+                DarkBlue    = [System.Drawing.Color]::FromArgb(0, 0, 139)
+                DarkGreen   = [System.Drawing.Color]::FromArgb(0, 100, 0)
+                DarkCyan    = [System.Drawing.Color]::FromArgb(0, 139, 139)
+                DarkRed     = [System.Drawing.Color]::FromArgb(139, 0, 0)
+                DarkMagenta = [System.Drawing.Color]::FromArgb(139, 0, 139)
+                DarkYellow  = [System.Drawing.Color]::FromArgb(184, 134, 11)
+                Gray        = [System.Drawing.Color]::FromArgb(128, 128, 128)
+                DarkGray    = [System.Drawing.Color]::FromArgb(169, 169, 169)
+                Blue        = [System.Drawing.Color]::FromArgb(0, 0, 255)
+                Green       = [System.Drawing.Color]::FromArgb(0, 255, 0)
+                Cyan        = [System.Drawing.Color]::FromArgb(0, 255, 255)
+                Red         = [System.Drawing.Color]::FromArgb(255, 0, 0)
+                Magenta     = [System.Drawing.Color]::FromArgb(255, 0, 255)
+                Yellow      = [System.Drawing.Color]::FromArgb(255, 255, 0)
+                White       = [System.Drawing.Color]::FromArgb(255, 255, 255)
+            }
+
+            if ($colorMap.ContainsKey($ConsoleColor.ToString()))
+            {
+                $color = $colorMap[$ConsoleColor.ToString()]
+                return "$($color.R);$($color.G);$($color.B)"
+            }
+            else
+            {
+                throw "Unsupported ConsoleColor: $ConsoleColor"
+            }
+        }
+
+        function FormatColorTokens
+        {
+            param (
+                [string]$InputString
+            )
+            $matches = [regex]::Matches($InputString, '\{(StartColor.*?|EndColor.*?)\}')
+
+            foreach ($match in $matches)
+            {
+                $token = $match.Groups[1].Value
+
+                if ($token -like 'StartColor*')
+                {
+                    $color = $token.split(':')[1]
+                    $RGB = Get-RgbFromConsoleColor -ConsoleColor $color
+                    $InputString = $InputString -replace $match.value, "`e[38;2;$($RGB)m"
+                }
+                elseif ($token -eq 'EndColor')
+                {
+                    $InputString = $InputString -replace '\{EndColor\}', "`e[0m"
+                }
+            }
+
+            return $InputString
+
+        }
+
         try
         {
             $ConsoleColors = @{
@@ -84,7 +148,9 @@
             {
                 if ($Configuration.OnlyColorizeLevel)
                 {
-                    $logtext = $logtext.replace($log.level, "`e[38;2;$($ConsoleColors.$($Configuration.ColorMapping[$OriginalLogLevel]))m$($log.level)`e[0m")
+                    $RGB = Get-RgbFromConsoleColor -ConsoleColor $Configuration.ColorMapping[$OriginalLogLevel]
+                    $logtext = $logtext.replace($log.level, "`e[38;2;$($RGB))m$($log.level)`e[0m")
+                    $logtext = FormatColorTokens -InputString $logtext
                     $ParentHost.UI.WriteLine($logtext)
                 }
                 else
