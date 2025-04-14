@@ -5,6 +5,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.0] - 2025-04-14
+
 ### Added
 
 - Plugin Console: You can now colorize individual text items both in the message and in the general format. See docs for more info.
