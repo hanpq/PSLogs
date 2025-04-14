@@ -244,6 +244,29 @@ The mutex name to acquire is `ConsoleMtx`
 
 Each color will be verified against `[System.ConsoleColor]`. If it is invalid, an error will appear on the screen along with the original message.
 
+#### Colorize text manually
+
+PSLogs allows you to freely colorize individual parts of the message or variables in the format string. The following two tokens can be used to configure parts of the strings with color.
+- `{StartColor:<color>}`
+- `{EndColor}`
+
+You can use it within the message itself:
+```powershell
+Write-Log -Level VERBOSE -Message 'This is a verbose {StartColor:Magenta}message{EndColor}'
+```
+![FormatColorMessage](https://raw.githubusercontent.com/hanpq/PSLogs/refs/heads/main/.build/FormatColorMessage.png)
+
+You can also use it within a format string:
+```powershell
+Add-LoggingTarget -Name Console -Configuration @{
+    OnlyColorizeLevel = $true
+    Format            = '{StartColor:Green}%{timestamp:+yyyy-MM-dd HH:mm:ss}{EndColor} | %{level:-7} | %{message}'
+}
+Write-Log -Level VERBOSE -Message 'This is a verbose {StartColor:Magenta}message{EndColor}'
+```
+![FormatColorMessage](https://raw.githubusercontent.com/hanpq/PSLogs/refs/heads/main/.build/FormatColorFormat.png)
+
+
 #### Example
 
 ```powershell
