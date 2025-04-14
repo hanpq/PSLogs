@@ -250,6 +250,8 @@ PSLogs allows you to freely colorize individual parts of the message or variable
 - `{StartColor:<color>}`
 - `{EndColor}`
 
+Note that it will only work with `OnlyColorizeLevel=$true` because if this is `$false` the whole line is colored which overrides this setting. 
+
 You can use it within the message itself:
 ```powershell
 Write-Log -Level VERBOSE -Message 'This is a verbose {StartColor:Magenta}message{EndColor}'
