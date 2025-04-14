@@ -44,26 +44,72 @@
             [hashtable] $Configuration
         )
 
+        function Get-RgbFromConsoleColor
+        {
+            param (
+                [Parameter(Mandatory)]
+                [System.ConsoleColor]$ConsoleColor
+            )
+
+            $colorMap = @{
+                Black       = [System.Drawing.Color]::FromArgb(0, 0, 0)
+                DarkBlue    = [System.Drawing.Color]::FromArgb(0, 0, 128)
+                DarkGreen   = [System.Drawing.Color]::FromArgb(0, 128, 0)
+                DarkCyan    = [System.Drawing.Color]::FromArgb(0, 128, 128)
+                DarkRed     = [System.Drawing.Color]::FromArgb(128, 0, 0)
+                DarkMagenta = [System.Drawing.Color]::FromArgb(128, 0, 128)
+                DarkYellow  = [System.Drawing.Color]::FromArgb(128, 128, 0)
+                Gray        = [System.Drawing.Color]::FromArgb(192, 192, 192)
+                DarkGray    = [System.Drawing.Color]::FromArgb(128, 128, 128)
+                Blue        = [System.Drawing.Color]::FromArgb(0, 0, 255)
+                Green       = [System.Drawing.Color]::FromArgb(0, 255, 0)
+                Cyan        = [System.Drawing.Color]::FromArgb(0, 255, 255)
+                Red         = [System.Drawing.Color]::FromArgb(255, 0, 0)
+                Magenta     = [System.Drawing.Color]::FromArgb(255, 0, 255)
+                Yellow      = [System.Drawing.Color]::FromArgb(255, 255, 0)
+                White       = [System.Drawing.Color]::FromArgb(255, 255, 255)
+            }
+
+            if ($colorMap.ContainsKey($ConsoleColor.ToString()))
+            {
+                $color = $colorMap[$ConsoleColor.ToString()]
+                return "$($color.R);$($color.G);$($color.B)"
+            }
+            else
+            {
+                throw "Unsupported ConsoleColor: $ConsoleColor"
+            }
+        }
+
+        function FormatColorTokens
+        {
+            param (
+                [string]$InputString
+            )
+            $matches = [regex]::Matches($InputString, '\{(StartColor.*?|EndColor.*?)\}')
+
+            foreach ($match in $matches)
+            {
+                $token = $match.Groups[1].Value
+
+                if ($token -like 'StartColor*')
+                {
+                    $color = $token.split(':')[1]
+                    $RGB = Get-RgbFromConsoleColor -ConsoleColor $color
+                    $InputString = $InputString -replace $match.value, "`e[38;2;$($RGB)m"
+                }
+                elseif ($token -eq 'EndColor')
+                {
+                    $InputString = $InputString -replace '\{EndColor\}', "`e[0m"
+                }
+            }
+
+            return $InputString
+
+        }
+
         try
         {
-            $ConsoleColors = @{
-                Black       = '0;0;0'
-                DarkBlue    = '0;0;128'
-                DarkGreen   = '0;128;0'
-                DarkCyan    = '0;128;128'
-                DarkRed     = '128;0;0'
-                DarkMagenta = '128;0;128'
-                DarkYellow  = '128;128;0'
-                Gray        = '192;192;192'
-                DarkGray    = '128;128;128'
-                Blue        = '0;0;255'
-                Green       = '0;255;0'
-                Cyan        = '0;255;255'
-                Red         = '255;0;0'
-                Magenta     = '255;0;255'
-                Yellow      = '255;255;0'
-                White       = '255;255;255'
-            }
             $OriginalLogLevel = $Log.Level
             if ($Configuration.ShortLevel)
             {
@@ -80,11 +126,19 @@
             $mtx = New-Object System.Threading.Mutex($false, 'ConsoleMtx')
             [void] $mtx.WaitOne()
 
+            # Colorize tokens is only supported if OnlyColorizeLevel is set to true. Otherwise the whole row is colored and the tokens are not visible.
+            if ($Configuration.OnlyColorizeLevel)
+            {
+                $logtext = FormatColorTokens -InputString $logtext
+            }
+
+            # If we have a color mapping for the log level, use it. Otherwise, just write the log text without color.
             if ($Configuration.ColorMapping.ContainsKey($OriginalLogLevel))
             {
                 if ($Configuration.OnlyColorizeLevel)
                 {
-                    $logtext = $logtext.replace($log.level, "`e[38;2;$($ConsoleColors.$($Configuration.ColorMapping[$OriginalLogLevel]))m$($log.level)`e[0m")
+                    $RGB = Get-RgbFromConsoleColor -ConsoleColor $Configuration.ColorMapping[$OriginalLogLevel]
+                    $logtext = $logtext.replace($log.level, "`e[38;2;$($RGB)m$($log.level)`e[0m")
                     $ParentHost.UI.WriteLine($logtext)
                 }
                 else
