@@ -53,14 +53,14 @@
 
             $colorMap = @{
                 Black       = [System.Drawing.Color]::FromArgb(0, 0, 0)
-                DarkBlue    = [System.Drawing.Color]::FromArgb(0, 0, 139)
-                DarkGreen   = [System.Drawing.Color]::FromArgb(0, 100, 0)
-                DarkCyan    = [System.Drawing.Color]::FromArgb(0, 139, 139)
-                DarkRed     = [System.Drawing.Color]::FromArgb(139, 0, 0)
-                DarkMagenta = [System.Drawing.Color]::FromArgb(139, 0, 139)
-                DarkYellow  = [System.Drawing.Color]::FromArgb(184, 134, 11)
-                Gray        = [System.Drawing.Color]::FromArgb(128, 128, 128)
-                DarkGray    = [System.Drawing.Color]::FromArgb(169, 169, 169)
+                DarkBlue    = [System.Drawing.Color]::FromArgb(0, 0, 128)
+                DarkGreen   = [System.Drawing.Color]::FromArgb(0, 128, 0)
+                DarkCyan    = [System.Drawing.Color]::FromArgb(0, 128, 128)
+                DarkRed     = [System.Drawing.Color]::FromArgb(128, 0, 0)
+                DarkMagenta = [System.Drawing.Color]::FromArgb(128, 0, 128)
+                DarkYellow  = [System.Drawing.Color]::FromArgb(128, 128, 0)
+                Gray        = [System.Drawing.Color]::FromArgb(192, 192, 192)
+                DarkGray    = [System.Drawing.Color]::FromArgb(128, 128, 128)
                 Blue        = [System.Drawing.Color]::FromArgb(0, 0, 255)
                 Green       = [System.Drawing.Color]::FromArgb(0, 255, 0)
                 Cyan        = [System.Drawing.Color]::FromArgb(0, 255, 255)
@@ -110,24 +110,6 @@
 
         try
         {
-            $ConsoleColors = @{
-                Black       = '0;0;0'
-                DarkBlue    = '0;0;128'
-                DarkGreen   = '0;128;0'
-                DarkCyan    = '0;128;128'
-                DarkRed     = '128;0;0'
-                DarkMagenta = '128;0;128'
-                DarkYellow  = '128;128;0'
-                Gray        = '192;192;192'
-                DarkGray    = '128;128;128'
-                Blue        = '0;0;255'
-                Green       = '0;255;0'
-                Cyan        = '0;255;255'
-                Red         = '255;0;0'
-                Magenta     = '255;0;255'
-                Yellow      = '255;255;0'
-                White       = '255;255;255'
-            }
             $OriginalLogLevel = $Log.Level
             if ($Configuration.ShortLevel)
             {
@@ -144,13 +126,19 @@
             $mtx = New-Object System.Threading.Mutex($false, 'ConsoleMtx')
             [void] $mtx.WaitOne()
 
+            # Colorize tokens is only supported if OnlyColorizeLevel is set to true. Otherwise the whole row is colored and the tokens are not visible.
+            if ($Configuration.OnlyColorizeLevel)
+            {
+                $logtext = FormatColorTokens -InputString $logtext
+            }
+
+            # If we have a color mapping for the log level, use it. Otherwise, just write the log text without color.
             if ($Configuration.ColorMapping.ContainsKey($OriginalLogLevel))
             {
                 if ($Configuration.OnlyColorizeLevel)
                 {
                     $RGB = Get-RgbFromConsoleColor -ConsoleColor $Configuration.ColorMapping[$OriginalLogLevel]
-                    $logtext = $logtext.replace($log.level, "`e[38;2;$($($ConsoleColors.$($Configuration.ColorMapping[$OriginalLogLevel]))))m$($log.level)`e[0m")
-                    #$logtext = FormatColorTokens -InputString $logtext
+                    $logtext = $logtext.replace($log.level, "`e[38;2;$($RGB)m$($log.level)`e[0m")
                     $ParentHost.UI.WriteLine($logtext)
                 }
                 else
