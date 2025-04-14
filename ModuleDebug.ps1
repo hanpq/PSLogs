@@ -75,15 +75,25 @@ Add-LoggingTarget -Name Console -Configuration @{
     Format            = '%{timestamp:+yyyy-MM-dd HH:mm:ss} | %{level:-7} | %{message}'
 }
 Log -FormatColor
+Start-Sleep -Seconds 1
+Write-Host
+Write-Log -Level VERBOSE -Message 'This is a verbose {StartColor:Magenta}message{EndColor}'
+Start-Sleep -Seconds 1
+Write-Host
 Wait-Logging
 
 Write-Host "`nDelimited with | and static level length and colorize level ('%{timestamp:+yyyy-MM-dd HH:mm:ss} | %{level:-7} | %{message}')"
 Add-LoggingTarget -Name Console -Configuration @{
     ShortLevel        = $false
     OnlyColorizeLevel = $true
-    Format            = '{StartColor:Blue}%{timestamp:+yyyy-MM-dd HH:mm:ss}{EndColor} | %{level:-7} | %{message}'
+    Format            = '{StartColor:Green}%{timestamp:+yyyy-MM-dd HH:mm:ss}{EndColor} | %{level:-7} | %{message}'
 }
 Log -FormatColor
+Start-Sleep -Seconds 1
+Write-Host
+Write-Log -Level VERBOSE -Message 'This is a verbose {StartColor:Magenta}message{EndColor}'
+Start-Sleep -Seconds 1
+Write-Host
 Wait-Logging
 
 
