@@ -149,8 +149,8 @@
                 if ($Configuration.OnlyColorizeLevel)
                 {
                     $RGB = Get-RgbFromConsoleColor -ConsoleColor $Configuration.ColorMapping[$OriginalLogLevel]
-                    $logtext = $logtext.replace($log.level, "`e[38;2;$($RGB))m$($log.level)`e[0m")
-                    $logtext = FormatColorTokens -InputString $logtext
+                    $logtext = $logtext.replace($log.level, "`e[38;2;$($($ConsoleColors.$($Configuration.ColorMapping[$OriginalLogLevel]))))m$($log.level)`e[0m")
+                    #$logtext = FormatColorTokens -InputString $logtext
                     $ParentHost.UI.WriteLine($logtext)
                 }
                 else
