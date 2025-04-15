@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Plugin Console: Fixed an issue where format colors cause an error on Powershell 5.1
+- Plugin Console: Fixed an issue where format colors cause an error on Windows Powershell 5.1
+- Plugin Console: Fixed an issue where Windows Powershell 5.1 where the ANSI escape character was not working.
 
 ## [5.5.0] - 2025-04-14
 
