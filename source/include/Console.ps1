@@ -50,6 +50,9 @@
             [hashtable] $Configuration
         )
 
+        # Windows Powershell does not know about the "`e`" escape character, so we need to use the [char]0x1b instead to support Windows Powershell.
+        $Esc = [char]0x1b
+
         function Get-RgbFromConsoleColor
         {
             param (
@@ -102,11 +105,11 @@
                 {
                     $color = $token.split(':')[1]
                     $RGB = Get-RgbFromConsoleColor -ConsoleColor $color
-                    $InputString = $InputString -replace $match.value, "`e[38;2;$($RGB)m"
+                    $InputString = $InputString -replace $match.value, "$Esc[38;2;$($RGB)m"
                 }
                 elseif ($token -eq 'EndColor')
                 {
-                    $InputString = $InputString -replace '\{EndColor\}', "`e[0m"
+                    $InputString = $InputString -replace '\{EndColor\}', "$Esc[0m"
                 }
             }
 
@@ -144,7 +147,7 @@
                 if ($Configuration.OnlyColorizeLevel)
                 {
                     $RGB = Get-RgbFromConsoleColor -ConsoleColor $Configuration.ColorMapping[$OriginalLogLevel]
-                    $logtext = $logtext.replace($log.level, "`e[38;2;$($RGB)m$($log.level)`e[0m")
+                    $logtext = $logtext.replace($log.level, "$Esc[38;2;$($RGB)m$($log.level)$Esc[0m")
                     $ParentHost.UI.WriteLine($logtext)
                 }
                 else
