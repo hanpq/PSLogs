@@ -37,6 +37,12 @@
                 continue
             }
         }
+
+        # System.Drawing is not automatically loaded in PowerShell desktop edition, so we need to load it manually.
+        if ($PSVersionTable.PSEdition -eq 'Desktop')
+        {
+            Add-Type -AssemblyName System.Drawing
+        }
     }
     Logger        = {
         param(
