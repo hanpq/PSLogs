@@ -79,9 +79,13 @@ Prereqs:
             Level        = $SysLogLevel
         }
 
+        $Params.AdditionalField = @{
+            'severity' = $Log.Level
+        }
+
         if ($Configuration.AdditionalField)
         {
-            $Params.AdditionalField = $Configuration.AdditionalField
+            $Params.AdditionalField = $Params.AdditionalField + $Configuration.AdditionalField
         }
 
         switch ($Configuration.Protocol)
