@@ -5,6 +5,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.2] - 2025-05-12
+
 ### Added
 
 - Plugin Gelf: Severity is now always added as an additional field with the text representation of the log level.
