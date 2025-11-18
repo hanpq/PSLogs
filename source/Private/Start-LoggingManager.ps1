@@ -59,9 +59,21 @@ function Start-LoggingManager
                     #Enumerating through a collection is intrinsically not a thread-safe procedure
                     for ($targetEnum = $Script:Logging.EnabledTargets.GetEnumerator(); $targetEnum.MoveNext(); )
                     {
-                        [string] $LoggingTarget = $targetEnum.Current.key
+                        [string] $DisplayName = $targetEnum.Current.key
                         [hashtable] $TargetConfiguration = $targetEnum.Current.Value
-                        $Logger = [scriptblock] $Script:Logging.Targets[$LoggingTarget].Logger
+
+                        # Get the target type - handle both new format (with Type property) and legacy format
+                        $TargetType = if ($TargetConfiguration.ContainsKey('Type')) {
+                            $TargetConfiguration.Type
+                        } else {
+                            $DisplayName  # Fallback for legacy configurations
+                        }
+                        if (-not $Script:Logging.Targets.ContainsKey($TargetType)) {
+                            $ParentHost.UI.WriteErrorLine("Target type '$TargetType' not found for target '$DisplayName'")
+                            continue
+                        }
+
+                        $Logger = [scriptblock] $Script:Logging.Targets[$TargetType].Logger
 
                         $targetLevelNo = Get-LevelNumber -Level $TargetConfiguration.Level
 

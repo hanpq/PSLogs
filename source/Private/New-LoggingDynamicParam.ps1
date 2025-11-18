@@ -21,6 +21,9 @@ Dictionary to be appended. (Useful for multiple dynamic params)
 .PARAMETER Mandatory
 Controls if parameter is mandatory for call. Defaults to $true
 
+.PARAMETER Alias
+Optional alias(es) for the parameter. Can be a single string or array of strings.
+
 .EXAMPLE
 DynamicParam{
     New-LoggingDynamicParam -Name "Level" -Level -DefaultValue 'Verbose'
@@ -52,6 +55,8 @@ function New-LoggingDynamicParam
         $Target,
         [boolean]
         $Mandatory = $true,
+        [string[]]
+        $Alias,
         [System.Management.Automation.RuntimeDefinedParameterDictionary]
         $DynamicParams
     )
@@ -70,6 +75,11 @@ function New-LoggingDynamicParam
 
     $attributeCollection.Add($attribute)
 
+    # Add alias attribute if provided
+    if ($Alias) {
+        $aliasAttribute = [System.Management.Automation.AliasAttribute]::new($Alias)
+        $attributeCollection.Add($aliasAttribute)
+    }
 
     [String[]] $allowedValues = @()
 

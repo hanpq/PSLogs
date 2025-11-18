@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for multiple targets of the same type. You can now instead of the -Name parameter use -Type and -DisplayName. The displayname must be unique and type can be the same as previously added logging targets. This change is backwards compatible where existing target definitions using the -Name parameter only will work as it is now an alias for the Type parameter. If you do not specify a Displayname it will fall back to using the Type name as Displayname.
+- Remove-LoggingTarget has been added to allow removal of defined logging targets during runtime.
+
+## [5.5.2] - 2025-05-12
+
+### Added
+
 - Plugin Gelf: Severity is now always added as an additional field with the text representation of the log level.
 
 ## [5.5.1] - 2025-04-15
