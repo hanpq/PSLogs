@@ -39,7 +39,15 @@ InModuleScope 'PSLogs' {
     }
 }
 
-Describe 'New syntax for multiple targets' {
+Describe 'Out of module scope tests' {
+    AfterEach {
+        (Get-LoggingTarget).GetEnumerator() | Select-Object -expand value | Select-Object -expand displayname | ForEach-Object {
+            Remove-LoggingTarget -DisplayName $PSItem
+        }
+        Get-ChildItem $TestDrive -Filter '*.log' | ForEach-Object {
+            Remove-Item $PSItem.FullName -Force
+        }
+    }
     Context 'New syntax (using Type and DisplayName parameters)' {
         It 'Should be possible to add multiple File targets with different DisplayNames' {
 
@@ -72,5 +80,67 @@ Describe 'New syntax for multiple targets' {
             $errorsOnlyContent | Should -Contain 'ERROR   | This goes to all targets'
         }
     }
+    Context 'Tag functionality' {
+        It 'Should work without tags' {
+            Add-LoggingTarget -Name 'File' -Configuration @{
+                Level  = 'DEBUG'
+                Path   = "$TestDrive\logs.log"
+                Format = '%{level:-7} | %{message}'
+            }
 
+            Write-Log -Level VERBOSE -Message 'Testmessage'
+
+            Wait-Logging
+            Start-Sleep -Seconds 1 # Ensure file write completion
+            $LogsContent = Get-Content "$TestDrive\logs.log"
+            $LogsContent | Should -Contain 'VERBOSE | Testmessage'
+        }
+        It 'Should work with tags' {
+            Add-LoggingTarget -Type File -DisplayName 'Logs' -Configuration @{
+                Level  = 'INFO'
+                Path   = "$TestDrive\logs.log"
+                Format = '%{level:-7} | %{message}'
+                Tags   = @('Default')
+            }
+
+            Add-LoggingTarget -Type File -DisplayName 'Changes' -Configuration @{
+                Level  = 'DEBUG'
+                Path   = "$TestDrive\changes.log"
+                Format = '%{level:-7} | %{message}'
+                Tags   = @('Changes')
+            }
+
+            Add-LoggingTarget -Type File -Displayname 'Combined' -Configuration @{
+                Level  = 'DEBUG'
+                Path   = "$TestDrive\combined.log"
+                Format = '%{level:-7} | %{message}'
+                Tags   = @('Default', 'Changes', 'Database')
+            }
+
+            Write-Log -Level INFO -Message 'This is a standard message'
+            Write-Log -Level INFO -Message 'This is also a standard message' -Tags @('Default')
+            Write-Log -Level SUCCESS -Message 'This is a change message' -Tags @('Changes')
+            Write-Log -Level ERROR -Message 'This is a change message' -Tags @('Changes')
+
+            Wait-Logging
+
+            Start-Sleep -Seconds 1 # Ensure file write completion
+
+            $logsContent = Get-Content "$TestDrive\logs.log"
+            $changesContent = Get-Content "$TestDrive\changes.log"
+            $combinedContent = Get-Content "$TestDrive\combined.log"
+
+            $logsContent | Should -Contain 'INFO    | This is a standard message'
+            $logsContent | Should -Contain 'INFO    | This is also a standard message'
+
+            $changesContent | Should -Contain 'SUCCESS | This is a change message'
+            $changesContent | Should -Contain 'ERROR   | This is a change message'
+
+            $combinedContent | Should -Contain 'INFO    | This is a standard message'
+            $combinedContent | Should -Contain 'INFO    | This is also a standard message'
+            $combinedContent | Should -Contain 'SUCCESS | This is a change message'
+            $combinedContent | Should -Contain 'ERROR   | This is a change message'
+
+        }
+    }
 }

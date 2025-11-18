@@ -11,12 +11,15 @@
         Unique identifier for this target instance. If not specified, defaults to the Type value
     .PARAMETER Configuration
         An hashtable containing the configurations for the target
+        Can include a 'Tags' key with an array of strings for tag-based message routing
     .EXAMPLE
         PS C:\> Add-LoggingTarget -Name Console -Configuration @{Level = 'DEBUG'}
     .EXAMPLE
         PS C:\> Add-LoggingTarget -Type File -DisplayName 'ErrorsOnly' -Configuration @{Level = 'ERROR'; Path = 'C:\Temp\errors.log'}
     .EXAMPLE
         PS C:\> Add-LoggingTarget -Name File -Configuration @{Level = 'INFO'; Path = 'C:\Temp\script.log'}
+    .EXAMPLE
+        PS C:\> Add-LoggingTarget -Type File -DisplayName 'DatabaseLogs' -Configuration @{Level = 'INFO'; Path = 'C:\Logs\db.log'; Tags = @('Database', 'Performance')}
     .LINK
         https://logging.readthedocs.io/en/latest/functions/Add-LoggingTarget.md
     .LINK
@@ -81,6 +84,16 @@ function Add-LoggingTarget
         $targetConfig = Merge-DefaultConfig -Target $targetType -Configuration $Configuration
         $targetConfig.Type = $targetType
         $targetConfig.DisplayName = $displayName
+
+        # Process tags for case-insensitive matching (default to 'Default' if not specified)
+        if ($Configuration.Tags)
+        {
+            $targetConfig.Tags = $Configuration.Tags | ForEach-Object { $_.ToLower() }
+        }
+        else
+        {
+            $targetConfig.Tags = @('default')
+        }
 
         $Script:Logging.EnabledTargets[$displayName] = $targetConfig
 

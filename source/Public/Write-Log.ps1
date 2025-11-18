@@ -22,6 +22,10 @@
     .PARAMETER ExceptionInfo
         Provide an optional ErrorRecord
 
+    .PARAMETER Tags
+        An array of tags to associate with the log message for target routing.
+        Defaults to 'Default' if not specified.
+
     .EXAMPLE
         PS C:\> Write-Log 'Hello, World!'
 
@@ -34,6 +38,9 @@
     .EXAMPLE
         PS C:\> Write-Log -Level ERROR -Message 'Hello, {0}!' -Arguments 'World' -Body @{Server='srv01.contoso.com'}
 
+    .EXAMPLE
+        PS C:\> Write-Log -Level INFO -Message 'Database operation completed' -Tags @('Database', 'Performance')
+
     .LINK
         https://logging.readthedocs.io/en/latest/functions/Write-Log.md
 
@@ -43,7 +50,7 @@
     .LINK
         https://github.com/EsOsO/Logging/blob/master/Logging/public/Write-Log.ps1
 #>
-Function Write-Log
+function Write-Log
 {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '', Justification = 'This is a judgement call. The argument is that if this module is loaded the user should be considered aware that this is the main cmdlet of the module.')]
     [CmdletBinding()]
@@ -59,16 +66,19 @@ Function Write-Log
         [object] $Body = $null,
         [Parameter(Position = 5,
             Mandatory = $false)]
-        [System.Management.Automation.ErrorRecord] $ExceptionInfo = $null
+        [System.Management.Automation.ErrorRecord] $ExceptionInfo = $null,
+        [Parameter(Position = 6,
+            Mandatory = $false)]
+        [string[]] $Tags = @('Default')
     )
 
-    DynamicParam
+    dynamicparam
     {
         New-LoggingDynamicParam -Level -Mandatory $false -Name 'Level'
         $PSBoundParameters['Level'] = 'INFO'
     }
 
-    End
+    end
     {
         $levelNumber = Get-LevelNumber -Level $PSBoundParameters.Level
         $invocationInfo = (Get-PSCallStack)[$Script:Logging.CallerScope]
@@ -79,6 +89,9 @@ Function Write-Log
         {
             $fileName = Split-Path -Path $invocationInfo.ScriptName -Leaf
         }
+
+        # Normalize tags to lowercase for case-insensitive matching
+        $normalizedTags = $Tags | ForEach-Object { $_.ToLower() }
 
         $logMessage = [hashtable] @{
             timestamp    = [datetime]::now
@@ -94,6 +107,7 @@ Function Write-Log
             body         = $Body
             execinfo     = $ExceptionInfo
             pid          = $PID
+            tags         = $normalizedTags
         }
 
         if ($PSBoundParameters.ContainsKey('Arguments'))

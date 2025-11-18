@@ -36,6 +36,27 @@ function Start-LoggingManager
     }
 
     #Setup runspace
+    # Ensure backward compatibility - add default tags to existing targets that don't have them
+    if ($Script:Logging.EnabledTargets)
+    {
+        $targetsToUpdate = @()
+        for ($targetEnum = $Script:Logging.EnabledTargets.GetEnumerator(); $targetEnum.MoveNext(); )
+        {
+            $displayName = $targetEnum.Current.Key
+            $targetConfig = $targetEnum.Current.Value
+            if (-not $targetConfig.ContainsKey('Tags'))
+            {
+                $targetsToUpdate += $displayName
+            }
+        }
+
+        foreach ($displayName in $targetsToUpdate)
+        {
+            $Script:Logging.EnabledTargets[$displayName].Tags = @('default')
+            Write-Verbose "Added default tags to existing target: $displayName"
+        }
+    }
+
     $Script:LoggingRunspace.Runspace = [runspacefactory]::CreateRunspace($Script:InitialSessionState)
     $Script:LoggingRunspace.Runspace.Name = 'LoggingQueueConsumer'
     $Script:LoggingRunspace.Runspace.Open()
@@ -77,7 +98,27 @@ function Start-LoggingManager
 
                         $targetLevelNo = Get-LevelNumber -Level $TargetConfiguration.Level
 
-                        if ($Log.LevelNo -ge $targetLevelNo)
+                        # Check level filtering
+                        $levelMatches = $Log.LevelNo -ge $targetLevelNo
+
+                        # Check tag filtering - get target tags (default to 'default' for legacy compatibility)
+                        $targetTags = if ($TargetConfiguration.ContainsKey('Tags')) {
+                            $TargetConfiguration.Tags
+                        } else {
+                            @('default')
+                        }
+
+                        # Get message tags (default to 'default' if not present)  
+                        $messageTags = if ($null -ne $Log.tags) {
+                            $Log.tags
+                        } else {
+                            @('default')
+                        }
+
+                        # Check if any message tag matches any target tag (intersection)
+                        $tagMatches = ($messageTags | Where-Object { $_ -in $targetTags }).Count -gt 0
+
+                        if ($levelMatches -and $tagMatches)
                         {
                             Invoke-Command -ScriptBlock $Logger -ArgumentList @($Log.PSObject.Copy(), $TargetConfiguration)
                         }
