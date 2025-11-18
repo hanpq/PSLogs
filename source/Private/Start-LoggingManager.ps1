@@ -108,7 +108,7 @@ function Start-LoggingManager
                             @('default')
                         }
 
-                        # Get message tags (default to 'default' if not present)  
+                        # Get message tags (default to 'default' if not present)
                         $messageTags = if ($null -ne $Log.tags) {
                             $Log.tags
                         } else {

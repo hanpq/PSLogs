@@ -211,6 +211,115 @@ Keys of the hashtable depends on the target you are configuring. The module ship
 
 When adding a target with `Add-LoggingTarget`, the `-Configuration` parameter accepts a hashtable where additional configuration items can be specified. Each target have its own set of items that can be configured. See the Target specific documentation for further information about the available options.
 
+#### Multiple Targets of Same Type
+
+Starting from version X.X.X, PSLogs supports multiple instances of the same target type using the `DisplayName` parameter. This allows you to configure multiple File targets, Console targets, etc., each with different configurations.
+
+```powershell
+# Multiple File targets with different configurations
+Add-LoggingTarget -Type File -DisplayName 'ErrorLogs' -Configuration @{
+    Level = 'ERROR'
+    Path = 'C:\Logs\errors.log'
+    Tags = @('Error', 'Critical')
+}
+
+Add-LoggingTarget -Type File -DisplayName 'DebugLogs' -Configuration @{
+    Level = 'DEBUG'
+    Path = 'C:\Logs\debug.log'
+    Tags = @('Debug', 'Development')
+}
+
+# Multiple Console targets with different formatting
+Add-LoggingTarget -Type Console -DisplayName 'SimpleConsole' -Configuration @{
+    Level = 'INFO'
+    Format = '%{message}'
+    Tags = @('User')
+}
+
+Add-LoggingTarget -Type Console -DisplayName 'DetailedConsole' -Configuration @{
+    Level = 'DEBUG'
+    Format = '[%{timestamp}] [%{level}] [%{caller}] %{message}'
+    Tags = @('Developer')
+}
+```
+
+**Parameters:**
+- `-Type`: The target type (File, Console, etc.)
+- `-DisplayName`: Unique identifier for this target instance. If omitted, defaults to the Type value
+- `-Configuration`: Target-specific configuration including the new `Tags` property
+
+**Note:** For backward compatibility, the `-Name` parameter is still supported as an alias for `-Type`.
+
+#### Tags-based Message Routing
+
+PSLogs now supports tag-based message routing, allowing you to send specific log messages to specific targets based on matching tags.
+
+**Target Configuration:**
+Targets can be configured with a `Tags` array in their configuration:
+
+```powershell
+Add-LoggingTarget -Type File -DisplayName 'DatabaseLogs' -Configuration @{
+    Level = 'DEBUG'
+    Path = 'C:\Logs\database.log'
+    Tags = @('Database', 'Performance')  # This target accepts messages tagged with 'Database' or 'Performance'
+}
+
+Add-LoggingTarget -Type File -DisplayName 'WebLogs' -Configuration @{
+    Level = 'INFO'
+    Path = 'C:\Logs\web.log'
+    Tags = @('Web', 'API', 'HTTP')  # This target accepts messages tagged with 'Web', 'API', or 'HTTP'
+}
+```
+
+**Message Tagging:**
+Log messages can be tagged using the `-Tags` parameter in `Write-Log`:
+
+```powershell
+# This message will only go to targets that have 'Database' in their tags
+Write-Log -Level INFO -Message 'Database connection established' -Tags 'Database'
+
+# This message will go to targets that have 'Web' OR 'Performance' in their tags
+Write-Log -Level DEBUG -Message 'API response time: 150ms' -Tags 'Web', 'Performance'
+
+# Multiple tags - message goes to targets matching ANY of these tags
+Write-Log -Level ERROR -Message 'Critical system failure' -Tags 'Database', 'Web', 'Critical'
+```
+
+**Tag Matching Rules:**
+- Tag matching is **case-insensitive** ('database' matches 'Database')
+- If a message has multiple tags, it will be sent to targets that match **any** of those tags (OR logic)
+- If a target has multiple tags, a message needs to match **any** of the target's tags to be routed there
+- Messages without tags default to the 'Default' tag
+- Targets without tags default to accepting the 'Default' tag
+- **Backward Compatibility:** Existing configurations without tags will continue to work as before
+
+**Example Scenario:**
+```powershell
+# Set up specialized logging targets
+Add-LoggingTarget -Type File -DisplayName 'GeneralLogs' -Configuration @{
+    Level = 'INFO'
+    Path = 'C:\Logs\general.log'
+    Tags = @('Default', 'General')  # Accepts default messages and general messages
+}
+
+Add-LoggingTarget -Type File -DisplayName 'DatabaseLogs' -Configuration @{
+    Level = 'DEBUG'
+    Path = 'C:\Logs\database.log'
+    Tags = @('Database', 'SQL', 'Performance')
+}
+
+Add-LoggingTarget -Type File -DisplayName 'ErrorLogs' -Configuration @{
+    Level = 'ERROR'
+    Path = 'C:\Logs\errors.log'
+    Tags = @('Error', 'Database', 'Web')  # Catches errors from multiple sources
+}
+
+# Usage
+Write-Log 'Application started'  # Goes to GeneralLogs (default tag)
+Write-Log -Message 'Query executed in 50ms' -Tags @('Database')  # Goes to DatabaseLogs
+Write-Log -Level ERROR -Message 'Connection failed' -Tags @('Database')  # Goes to both DatabaseLogs and ErrorLogs
+```
+
 ### Console
 
 From version 2.3.3 it supports acquiring lock for issues with git prompt that sometimes gets splitted during output.
@@ -226,6 +335,7 @@ The mutex name to acquire is `ConsoleMtx`
 | ColorMapping      | Hashtable |    No     | _See below_    | Overrides the default color mappings                                                                                            |
 | OnlyColorizeLevel | Boolean   |    No     | $false         | If set to true, only the level name is colorized instead of the whole log row.                                                  |
 | ShortLevel        | Boolean   |    No     | $false         | If true the written level name is trimmed to three chars, ie ERROR -> ERR. This makes the logs more aligned and easier to read. |
+| Tags              | String[]  |    No     | @('Default')   | Array of tags for message routing. Messages with matching tags will be sent to this target.                                     |
 
 ##### Default color mappings
 | Level     | Color    |
@@ -309,6 +419,7 @@ Add-LoggingTarget -Name Console -Configuration @{
 | RotateAfterDate   | DateTime |    No     | N/A            | Rotate after the difference between the current datetime and the datetime of the file(s) are greater then the given timespan    |
 | RotateAfterSize   | Int      |    No     | N/A            | Rotate after the file(s) are greater than the given size in BYTES                                                               |
 | CompressionPath   | String   |    No     | N/A            | Path of archive (*.zip) to create for the rotated files                                                                         |
+| Tags              | String[] |    No     | @('Default')   | Array of tags for message routing. Messages with matching tags will be sent to this target.                                     |
 
 #### Example
 
@@ -325,7 +436,8 @@ Add-LoggingTarget -Name Console -Configuration @{
     RotateAmount      = <NOTSET>          
     RotateAfterDate   = <NOTSET>          
     RotateAfterSize   = <NOTSET>          
-    CompressionPath   = <NOTSET>          
+    CompressionPath   = <NOTSET>
+    Tags            = @('File', 'Application')
 }
 ```
 
@@ -790,6 +902,44 @@ Write-Log accepts the following parameters
 - `-Arguments` parameter allows you to use format placeholders in the message like, -Message 'Hello, {0}' -Arguments $Username
 - `-Body` parameter allows you pass additional info the target. Please see the target specific documentation for more information.
 - `-ExceptionInfo` parameter allows you to pass an Exception object to the target. Targets might process these objects differently.
+- `-Tags` parameter allows you to specify an array of tags for message routing to specific targets. Defaults to 'Default' if not specified.
+
+#### Tags Parameter Examples
+
+```powershell
+# Default behavior (no tags specified - uses 'Default' tag)
+Write-Log -Level INFO -Message 'Application started'
+
+# Single tag
+Write-Log -Level DEBUG -Message 'Database query executed' -Tags 'Database'
+
+# Multiple tags (message will be routed to targets matching ANY of these tags)
+Write-Log -Level WARNING -Message 'Performance issue detected' -Tags 'Performance', 'Web', 'Monitoring'
+
+# Case doesn't matter (these are equivalent)
+Write-Log -Message 'Test message' -Tags @('Database')
+Write-Log -Message 'Test message' -Tags @('database')
+Write-Log -Message 'Test message' -Tags @('DATABASE')
+```
+- `-Tags` parameter allows you to specify an array of tags for message routing to specific targets. Defaults to 'Default' if not specified.
+
+#### Tags Parameter Examples
+
+```powershell
+# Default behavior (no tags specified - uses 'Default' tag)
+Write-Log -Level INFO -Message 'Application started'
+
+# Single tag
+Write-Log -Level DEBUG -Message 'Database query executed' -Tags @('Database')
+
+# Multiple tags (message will be routed to targets matching ANY of these tags)
+Write-Log -Level WARNING -Message 'Performance issue detected' -Tags @('Performance', 'Web', 'Monitoring')
+
+# Case doesn't matter (these are equivalent)
+Write-Log -Message 'Test message' -Tags @('Database')
+Write-Log -Message 'Test message' -Tags @('database')
+Write-Log -Message 'Test message' -Tags @('DATABASE')
+```
 
 ## Contributing
 
