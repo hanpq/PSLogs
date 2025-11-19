@@ -5,6 +5,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Change
+
+- Improved internal function documentation
+- Improved build tests
+
 ## [5.6.1] - 2025-11-19
 
 ### Change
