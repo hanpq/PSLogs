@@ -21,8 +21,15 @@ InModuleScope 'PSLogs' {
 
     Describe 'File target' -Tags Targets, TargetFile {
         AfterEach {
-            (Get-LoggingTarget).GetEnumerator() | Select-Object -expand value | Select-Object -expand displayname | ForEach-Object {
-                Remove-LoggingTarget -DisplayName $PSItem
+            $targets = Get-LoggingTarget
+            if ($targets) {
+                $targets.GetEnumerator() | ForEach-Object {
+                    if ($_.Value.DisplayName) {
+                        Remove-LoggingTarget -DisplayName $_.Value.DisplayName
+                    } else {
+                        Remove-LoggingTarget -DisplayName $_.Key
+                    }
+                }
             }
         }
         Context 'Old syntax (using Name parameter)' {
@@ -41,8 +48,15 @@ InModuleScope 'PSLogs' {
 
 Describe 'Out of module scope tests' {
     AfterEach {
-        (Get-LoggingTarget).GetEnumerator() | Select-Object -expand value | Select-Object -expand displayname | ForEach-Object {
-            Remove-LoggingTarget -DisplayName $PSItem
+        $targets = Get-LoggingTarget
+        if ($targets) {
+            $targets.GetEnumerator() | ForEach-Object {
+                if ($_.Value.DisplayName) {
+                    Remove-LoggingTarget -DisplayName $_.Value.DisplayName
+                } else {
+                    Remove-LoggingTarget -DisplayName $_.Key
+                }
+            }
         }
         Get-ChildItem $TestDrive -Filter '*.log' | ForEach-Object {
             Remove-Item $PSItem.FullName -Force
@@ -71,6 +85,7 @@ Describe 'Out of module scope tests' {
             Write-Log -Level ERROR -Message 'This goes to all targets'
 
             Wait-Logging
+            Start-Sleep -Seconds 1
 
             $allLogsContent = Get-Content "$TestDrive\all_logs.log"
             $allLogsContent | Should -Contain 'INFO    | This goes to AllLogs only'
