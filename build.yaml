@@ -87,7 +87,7 @@ Pester:
       OutputPath:
       OutputEncoding:
       TestSuiteName:
-  ExcludeFromCodeCoverage:
+  ExcludeFromCodeCoverage: include
 
 ####################################################
 #       Misc                                       #
