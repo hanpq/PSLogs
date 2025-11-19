@@ -24,10 +24,10 @@ InModuleScope 'PSLogs' {
             $targets = Get-LoggingTarget
             if ($targets) {
                 $targets.GetEnumerator() | ForEach-Object {
-                    if ($_.Value.DisplayName) {
-                        Remove-LoggingTarget -DisplayName $_.Value.DisplayName
+                    if ($_.Value.UniqueName) {
+                        Remove-LoggingTarget -UniqueName $_.Value.UniqueName
                     } else {
-                        Remove-LoggingTarget -DisplayName $_.Key
+                        Remove-LoggingTarget -UniqueName $_.Key
                     }
                 }
             }
@@ -51,10 +51,10 @@ Describe 'Out of module scope tests' {
         $targets = Get-LoggingTarget
         if ($targets) {
             $targets.GetEnumerator() | ForEach-Object {
-                if ($_.Value.DisplayName) {
-                    Remove-LoggingTarget -DisplayName $_.Value.DisplayName
+                if ($_.Value.UniqueName) {
+                    Remove-LoggingTarget -UniqueName $_.Value.UniqueName
                 } else {
-                    Remove-LoggingTarget -DisplayName $_.Key
+                    Remove-LoggingTarget -UniqueName $_.Key
                 }
             }
         }
@@ -62,16 +62,16 @@ Describe 'Out of module scope tests' {
             Remove-Item $PSItem.FullName -Force
         }
     }
-    Context 'New syntax (using Type and DisplayName parameters)' {
-        It 'Should be possible to add multiple File targets with different DisplayNames' {
+    Context 'New syntax (using Type and UniqueName parameters)' {
+        It 'Should be possible to add multiple File targets with different UniqueNames' {
 
-            Add-LoggingTarget -Type File -DisplayName 'AllLogs' -Configuration @{
+            Add-LoggingTarget -Type File -UniqueName 'AllLogs' -Configuration @{
                 Path   = "$TestDrive\all_logs.log"
                 Level  = 'DEBUG'
                 Format = '%{level:-7} | %{message}'
             }
 
-            Add-LoggingTarget -Type File -DisplayName 'ErrorsOnly' -Configuration @{
+            Add-LoggingTarget -Type File -UniqueName 'ErrorsOnly' -Configuration @{
                 Path   = "$TestDrive\errors_only.log"
                 Level  = 'ERROR'
                 Format = '%{level:-7} | %{message}'
@@ -111,21 +111,21 @@ Describe 'Out of module scope tests' {
             $LogsContent | Should -Contain 'VERBOSE | Testmessage'
         }
         It 'Should work with tags' {
-            Add-LoggingTarget -Type File -DisplayName 'Logs' -Configuration @{
+            Add-LoggingTarget -Type File -UniqueName 'Logs' -Configuration @{
                 Level  = 'INFO'
                 Path   = "$TestDrive\logs.log"
                 Format = '%{level:-7} | %{message}'
                 Tags   = @('Default')
             }
 
-            Add-LoggingTarget -Type File -DisplayName 'Changes' -Configuration @{
+            Add-LoggingTarget -Type File -UniqueName 'Changes' -Configuration @{
                 Level  = 'DEBUG'
                 Path   = "$TestDrive\changes.log"
                 Format = '%{level:-7} | %{message}'
                 Tags   = @('Changes')
             }
 
-            Add-LoggingTarget -Type File -Displayname 'Combined' -Configuration @{
+            Add-LoggingTarget -Type File -UniqueName 'Combined' -Configuration @{
                 Level  = 'DEBUG'
                 Path   = "$TestDrive\combined.log"
                 Format = '%{level:-7} | %{message}'

@@ -7,7 +7,7 @@
         The type of the target to enable and configure
     .PARAMETER Name
         Alias for Type parameter (maintained for backward compatibility)
-    .PARAMETER DisplayName
+    .PARAMETER UniqueName
         Unique identifier for this target instance. If not specified, defaults to the Type value
     .PARAMETER Configuration
         An hashtable containing the configurations for the target
@@ -15,11 +15,11 @@
     .EXAMPLE
         PS C:\> Add-LoggingTarget -Name Console -Configuration @{Level = 'DEBUG'}
     .EXAMPLE
-        PS C:\> Add-LoggingTarget -Type File -DisplayName 'ErrorsOnly' -Configuration @{Level = 'ERROR'; Path = 'C:\Temp\errors.log'}
+        PS C:\> Add-LoggingTarget -Type File -UniqueName 'ErrorsOnly' -Configuration @{Level = 'ERROR'; Path = 'C:\Temp\errors.log'}
     .EXAMPLE
         PS C:\> Add-LoggingTarget -Name File -Configuration @{Level = 'INFO'; Path = 'C:\Temp\script.log'}
     .EXAMPLE
-        PS C:\> Add-LoggingTarget -Type File -DisplayName 'DatabaseLogs' -Configuration @{Level = 'INFO'; Path = 'C:\Logs\db.log'; Tags = @('Database', 'Performance')}
+        PS C:\> Add-LoggingTarget -Type File -UniqueName 'DatabaseLogs' -Configuration @{Level = 'INFO'; Path = 'C:\Logs\db.log'; Tags = @('Database', 'Performance')}
     .LINK
         https://logging.readthedocs.io/en/latest/functions/Add-LoggingTarget.md
     .LINK
@@ -42,13 +42,13 @@ function Add-LoggingTarget
         # Create Type parameter with Name as alias for backward compatibility
         $dictionary = New-LoggingDynamicParam -Name 'Type' -Target -Alias @('Name')
 
-        # Add DisplayName parameter
-        $displayNameAttribute = New-Object System.Management.Automation.ParameterAttribute
-        $displayNameAttribute.Mandatory = $false
-        $displayNameCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
-        $displayNameCollection.Add($displayNameAttribute)
-        $displayNameParam = New-Object System.Management.Automation.RuntimeDefinedParameter('DisplayName', [string], $displayNameCollection)
-        $dictionary.Add('DisplayName', $displayNameParam)
+        # Add UniqueName parameter
+        $uniqueNameAttribute = New-Object System.Management.Automation.ParameterAttribute
+        $uniqueNameAttribute.Mandatory = $false
+        $uniqueNameCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
+        $uniqueNameCollection.Add($uniqueNameAttribute)
+        $uniqueNameParam = New-Object System.Management.Automation.RuntimeDefinedParameter('UniqueName', [string], $uniqueNameCollection)
+        $dictionary.Add('UniqueName', $uniqueNameParam)
 
         return $dictionary
     }
@@ -58,20 +58,20 @@ function Add-LoggingTarget
         # Determine target type (Type parameter or Name alias)
         $targetType = $PSBoundParameters.Type
 
-        # Determine display name (use DisplayName if provided, otherwise use target type)
-        $displayName = if ($PSBoundParameters.DisplayName)
+        # Determine unique name (use UniqueName if provided, otherwise use target type)
+        $uniqueName = if ($PSBoundParameters.UniqueName)
         {
-            $PSBoundParameters.DisplayName
+            $PSBoundParameters.UniqueName
         }
         else
         {
             $targetType
         }
 
-        # Allow replacing existing targets with same DisplayName for backward compatibility
-        if ($Script:Logging.EnabledTargets.ContainsKey($displayName))
+        # Allow replacing existing targets with same UniqueName for backward compatibility
+        if ($Script:Logging.EnabledTargets.ContainsKey($uniqueName))
         {
-            Write-Verbose "Replacing existing logging target with DisplayName '$displayName'"
+            Write-Verbose "Replacing existing logging target with UniqueName '$uniqueName'"
         }
 
         # Validate that the target type exists
@@ -83,7 +83,7 @@ function Add-LoggingTarget
         # Create target configuration with type and display name metadata
         $targetConfig = Merge-DefaultConfig -Target $targetType -Configuration $Configuration
         $targetConfig.Type = $targetType
-        $targetConfig.DisplayName = $displayName
+        $targetConfig.UniqueName = $uniqueName
 
         # Process tags for case-insensitive matching (default to 'Default' if not specified)
         if ($Configuration.Tags)
@@ -95,7 +95,7 @@ function Add-LoggingTarget
             $targetConfig.Tags = @('default')
         }
 
-        $Script:Logging.EnabledTargets[$displayName] = $targetConfig
+        $Script:Logging.EnabledTargets[$uniqueName] = $targetConfig
 
         # Special case hack - resolve target file path if it's a relative path
         # This can't be done in the Init scriptblock of the logging target because that scriptblock gets created in the
@@ -103,12 +103,12 @@ function Add-LoggingTarget
         # current working directory at the time when `Add-LoggingTarget` is being called and can't accurately resolve the relative path.
         if ($targetType -eq 'File')
         {
-            $Script:Logging.EnabledTargets[$displayName].Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Configuration.Path)
+            $Script:Logging.EnabledTargets[$uniqueName].Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Configuration.Path)
         }
 
         if ($Script:Logging.Targets[$targetType].Init -is [scriptblock])
         {
-            & $Script:Logging.Targets[$targetType].Init $Script:Logging.EnabledTargets[$displayName]
+            & $Script:Logging.Targets[$targetType].Init $Script:Logging.EnabledTargets[$uniqueName]
         }
     }
 }

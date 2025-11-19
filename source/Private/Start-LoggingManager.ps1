@@ -42,18 +42,18 @@ function Start-LoggingManager
         $targetsToUpdate = @()
         for ($targetEnum = $Script:Logging.EnabledTargets.GetEnumerator(); $targetEnum.MoveNext(); )
         {
-            $displayName = $targetEnum.Current.Key
+            $uniqueName = $targetEnum.Current.Key
             $targetConfig = $targetEnum.Current.Value
             if (-not $targetConfig.ContainsKey('Tags'))
             {
-                $targetsToUpdate += $displayName
+                $targetsToUpdate += $uniqueName
             }
         }
 
-        foreach ($displayName in $targetsToUpdate)
+        foreach ($uniqueName in $targetsToUpdate)
         {
-            $Script:Logging.EnabledTargets[$displayName].Tags = @('default')
-            Write-Verbose "Added default tags to existing target: $displayName"
+            $Script:Logging.EnabledTargets[$uniqueName].Tags = @('default')
+            Write-Verbose "Added default tags to existing target: $uniqueName"
         }
     }
 
@@ -80,17 +80,17 @@ function Start-LoggingManager
                     #Enumerating through a collection is intrinsically not a thread-safe procedure
                     for ($targetEnum = $Script:Logging.EnabledTargets.GetEnumerator(); $targetEnum.MoveNext(); )
                     {
-                        [string] $DisplayName = $targetEnum.Current.key
+                        [string] $UniqueName = $targetEnum.Current.key
                         [hashtable] $TargetConfiguration = $targetEnum.Current.Value
 
                         # Get the target type - handle both new format (with Type property) and legacy format
                         $TargetType = if ($TargetConfiguration.ContainsKey('Type')) {
                             $TargetConfiguration.Type
                         } else {
-                            $DisplayName  # Fallback for legacy configurations
+                            $UniqueName  # Fallback for legacy configurations
                         }
                         if (-not $Script:Logging.Targets.ContainsKey($TargetType)) {
-                            $ParentHost.UI.WriteErrorLine("Target type '$TargetType' not found for target '$DisplayName'")
+                            $ParentHost.UI.WriteErrorLine("Target type '$TargetType' not found for target '$UniqueName'")
                             continue
                         }
 

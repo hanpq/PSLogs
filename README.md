@@ -213,30 +213,30 @@ When adding a target with `Add-LoggingTarget`, the `-Configuration` parameter ac
 
 #### Multiple Targets of Same Type
 
-Starting from version X.X.X, PSLogs supports multiple instances of the same target type using the `DisplayName` parameter. This allows you to configure multiple File targets, Console targets, etc., each with different configurations.
+Starting from version X.X.X, PSLogs supports multiple instances of the same target type using the `UniqueName` parameter. This allows you to configure multiple File targets, Console targets, etc., each with different configurations.
 
 ```powershell
 # Multiple File targets with different configurations
-Add-LoggingTarget -Type File -DisplayName 'ErrorLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'ErrorLogs' -Configuration @{
     Level = 'ERROR'
-    Path = 'C:\Logs\errors.log'
+    Path = 'C:\\Logs\\errors.log'
     Tags = @('Error', 'Critical')
 }
 
-Add-LoggingTarget -Type File -DisplayName 'DebugLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'DebugLogs' -Configuration @{
     Level = 'DEBUG'
-    Path = 'C:\Logs\debug.log'
+    Path = 'C:\\Logs\\debug.log'
     Tags = @('Debug', 'Development')
 }
 
 # Multiple Console targets with different formatting
-Add-LoggingTarget -Type Console -DisplayName 'SimpleConsole' -Configuration @{
+Add-LoggingTarget -Type Console -UniqueName 'SimpleConsole' -Configuration @{
     Level = 'INFO'
     Format = '%{message}'
     Tags = @('User')
 }
 
-Add-LoggingTarget -Type Console -DisplayName 'DetailedConsole' -Configuration @{
+Add-LoggingTarget -Type Console -UniqueName 'DetailedConsole' -Configuration @{
     Level = 'DEBUG'
     Format = '[%{timestamp}] [%{level}] [%{caller}] %{message}'
     Tags = @('Developer')
@@ -245,7 +245,7 @@ Add-LoggingTarget -Type Console -DisplayName 'DetailedConsole' -Configuration @{
 
 **Parameters:**
 - `-Type`: The target type (File, Console, etc.)
-- `-DisplayName`: Unique identifier for this target instance. If omitted, defaults to the Type value
+- `-UniqueName`: Unique identifier for this target instance. If omitted, defaults to the Type value
 - `-Configuration`: Target-specific configuration including the new `Tags` property
 
 **Note:** For backward compatibility, the `-Name` parameter is still supported as an alias for `-Type`.
@@ -258,13 +258,13 @@ PSLogs now supports tag-based message routing, allowing you to send specific log
 Targets can be configured with a `Tags` array in their configuration:
 
 ```powershell
-Add-LoggingTarget -Type File -DisplayName 'DatabaseLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'DatabaseLogs' -Configuration @{
     Level = 'DEBUG'
-    Path = 'C:\Logs\database.log'
+    Path = 'C:\\Logs\\database.log'
     Tags = @('Database', 'Performance')  # This target accepts messages tagged with 'Database' or 'Performance'
 }
 
-Add-LoggingTarget -Type File -DisplayName 'WebLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'WebLogs' -Configuration @{
     Level = 'INFO'
     Path = 'C:\Logs\web.log'
     Tags = @('Web', 'API', 'HTTP')  # This target accepts messages tagged with 'Web', 'API', or 'HTTP'
@@ -296,19 +296,19 @@ Write-Log -Level ERROR -Message 'Critical system failure' -Tags 'Database', 'Web
 **Example Scenario:**
 ```powershell
 # Set up specialized logging targets
-Add-LoggingTarget -Type File -DisplayName 'GeneralLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'GeneralLogs' -Configuration @{
     Level = 'INFO'
-    Path = 'C:\Logs\general.log'
+    Path = 'C:\\Logs\\general.log'
     Tags = @('Default', 'General')  # Accepts default messages and general messages
 }
 
-Add-LoggingTarget -Type File -DisplayName 'DatabaseLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'DatabaseLogs' -Configuration @{
     Level = 'DEBUG'
-    Path = 'C:\Logs\database.log'
+    Path = 'C:\\Logs\\database.log'
     Tags = @('Database', 'SQL', 'Performance')
 }
 
-Add-LoggingTarget -Type File -DisplayName 'ErrorLogs' -Configuration @{
+Add-LoggingTarget -Type File -UniqueName 'ErrorLogs' -Configuration @{
     Level = 'ERROR'
     Path = 'C:\Logs\errors.log'
     Tags = @('Error', 'Database', 'Web')  # Catches errors from multiple sources

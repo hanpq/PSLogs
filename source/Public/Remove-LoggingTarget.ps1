@@ -3,16 +3,16 @@
         Remove a logging target
     .DESCRIPTION
         This function removes a previously configured logging target
-    .PARAMETER DisplayName
-        The DisplayName of the target to remove. If not specified, removes target by Type name
+    .PARAMETER UniqueName
+        The UniqueName of the target to remove. If not specified, removes target by Type name
     .PARAMETER Name
-        Alias for DisplayName parameter (maintained for backward compatibility)
+        Alias for Type parameter (maintained for backward compatibility)
     .PARAMETER Type
-        The type of target to remove (used when DisplayName is not specified)
+        The type of target to remove (used when UniqueName is not specified)
     .EXAMPLE
-        PS C:\> Remove-LoggingTarget -DisplayName 'ErrorsOnly'
+        PS C:\> Remove-LoggingTarget -UniqueName 'ErrorsOnly'
 
-        Removes the target with DisplayName 'ErrorsOnly'
+        Removes the target with UniqueName 'ErrorsOnly'
     .EXAMPLE
         PS C:\> Remove-LoggingTarget -Name Console
 
@@ -30,11 +30,11 @@ function Remove-LoggingTarget
 {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'No system state changed.')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Writes help when input is incorrect')]
-    [CmdletBinding(DefaultParameterSetName = 'ByDisplayName', HelpUri = 'https://logging.readthedocs.io/en/latest/functions/Remove-LoggingTarget.md')]
+    [CmdletBinding(DefaultParameterSetName = 'ByUniqueName', HelpUri = 'https://logging.readthedocs.io/en/latest/functions/Remove-LoggingTarget.md')]
     param(
-        [Parameter(ParameterSetName = 'ByDisplayName', Position = 0)]
+        [Parameter(ParameterSetName = 'ByUniqueName', Position = 0)]
         [Alias('Name')]
-        [string] $DisplayName,
+        [string] $UniqueName,
 
         [Parameter(ParameterSetName = 'ByType', Mandatory)]
         [string] $Type
@@ -70,15 +70,15 @@ function Remove-LoggingTarget
 
         if ($targetsToRemove.Count -gt 1)
         {
-            Write-Warning "Multiple targets of type '$Type' found: $($targetsToRemove -join ', '). Use -DisplayName to remove a specific target."
+            Write-Warning "Multiple targets of type '$Type' found: $($targetsToRemove -join ', '). Use -UniqueName to remove a specific target."
             return
         }
 
-        $DisplayName = $targetsToRemove[0]
+        $UniqueName = $targetsToRemove[0]
     }
 
-    # If no DisplayName provided, list available targets
-    if (-not $DisplayName)
+    # If no UniqueName provided, list available targets
+    if (-not $UniqueName)
     {
         if ($Script:Logging.EnabledTargets.Count -eq 0)
         {
@@ -98,16 +98,16 @@ function Remove-LoggingTarget
             {
                 $targetEntry.Key
             }
-            Write-Host "  DisplayName: $($targetEntry.Key), Type: $targetType"
+            Write-Host "  UniqueName: $($targetEntry.Key), Type: $targetType"
         }
-        Write-Host 'Use -DisplayName to specify which target to remove'
+        Write-Host 'Use -UniqueName to specify which target to remove'
         return
     }
 
     # Check if target exists
-    if (-not $Script:Logging.EnabledTargets.ContainsKey($DisplayName))
+    if (-not $Script:Logging.EnabledTargets.ContainsKey($UniqueName))
     {
-        Write-Warning "Logging target with DisplayName '$DisplayName' not found"
+        Write-Warning "Logging target with UniqueName '$UniqueName' not found"
         if ($Script:Logging.EnabledTargets.Count -gt 0)
         {
             Write-Host "Available targets: $($Script:Logging.EnabledTargets.Keys -join ', ')"
@@ -116,22 +116,22 @@ function Remove-LoggingTarget
     }
 
     # Get target info for confirmation message
-    $targetConfig = $Script:Logging.EnabledTargets[$DisplayName]
+    $targetConfig = $Script:Logging.EnabledTargets[$UniqueName]
     $targetType = if ($targetConfig.ContainsKey('Type'))
     {
         $targetConfig.Type
     }
     else
     {
-        $DisplayName
+        $UniqueName
     }
 
     # Remove the target
-    $removed = $Script:Logging.EnabledTargets.TryRemove($DisplayName, [ref]$null)
+    $removed = $Script:Logging.EnabledTargets.TryRemove($UniqueName, [ref]$null)
 
     if ($removed)
     {
-        Write-Verbose "Successfully removed logging target '$DisplayName' (Type: $targetType)"
+        Write-Verbose "Successfully removed logging target '$UniqueName' (Type: $targetType)"
 
         # If this was the last target, inform the user
         if ($Script:Logging.EnabledTargets.Count -eq 0)
@@ -141,6 +141,6 @@ function Remove-LoggingTarget
     }
     else
     {
-        Write-Warning "Failed to remove logging target '$DisplayName'"
+        Write-Warning "Failed to remove logging target '$UniqueName'"
     }
 }
