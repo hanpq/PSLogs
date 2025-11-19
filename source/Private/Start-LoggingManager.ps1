@@ -1,3 +1,41 @@
+<#
+    .SYNOPSIS
+        Starts the asynchronous logging consumer runspace
+
+    .DESCRIPTION
+        This function initializes and starts the background consumer runspace that processes
+        log messages from the queue and dispatches them to configured targets. It sets up
+        a separate PowerShell runspace with its own session state, imports necessary variables
+        and functions, and starts the consumer loop that processes messages until the queue
+        is marked as completed.
+
+    .PARAMETER ConsumerStartupTimeout
+        The maximum time to wait for the consumer runspace to initialize before timing out.
+        Defaults to 10 seconds.
+
+    .EXAMPLE
+        PS C:\> Start-LoggingManager
+
+        Starts the logging manager with default 10-second startup timeout
+
+    .EXAMPLE
+        PS C:\> Start-LoggingManager -ConsumerStartupTimeout '00:00:30'
+
+        Starts the logging manager with a 30-second startup timeout
+
+    .NOTES
+        This is an internal function that is automatically called when the first Write-Log
+        command is executed. The consumer runspace:
+
+        - Runs in a separate thread for non-blocking logging operations
+        - Processes messages from a BlockingCollection queue
+        - Applies level and tag filtering before sending to targets
+        - Handles target initialization and error handling
+        - Supports graceful shutdown when the module is unloaded
+
+        The function creates thread-safe collections and synchronization primitives
+        to coordinate between the main thread and the consumer runspace.
+#>
 function Start-LoggingManager
 {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Does not alter system state')]
@@ -84,12 +122,16 @@ function Start-LoggingManager
                         [hashtable] $TargetConfiguration = $targetEnum.Current.Value
 
                         # Get the target type - handle both new format (with Type property) and legacy format
-                        $TargetType = if ($TargetConfiguration.ContainsKey('Type')) {
+                        $TargetType = if ($TargetConfiguration.ContainsKey('Type'))
+                        {
                             $TargetConfiguration.Type
-                        } else {
+                        }
+                        else
+                        {
                             $UniqueName  # Fallback for legacy configurations
                         }
-                        if (-not $Script:Logging.Targets.ContainsKey($TargetType)) {
+                        if (-not $Script:Logging.Targets.ContainsKey($TargetType))
+                        {
                             $ParentHost.UI.WriteErrorLine("Target type '$TargetType' not found for target '$UniqueName'")
                             continue
                         }
@@ -102,16 +144,22 @@ function Start-LoggingManager
                         $levelMatches = $Log.LevelNo -ge $targetLevelNo
 
                         # Check tag filtering - get target tags (default to 'default' for legacy compatibility)
-                        $targetTags = if ($TargetConfiguration.ContainsKey('Tags')) {
+                        $targetTags = if ($TargetConfiguration.ContainsKey('Tags'))
+                        {
                             $TargetConfiguration.Tags
-                        } else {
+                        }
+                        else
+                        {
                             @('default')
                         }
 
                         # Get message tags (default to 'default' if not present)
-                        $messageTags = if ($null -ne $Log.tags) {
+                        $messageTags = if ($null -ne $Log.tags)
+                        {
                             $Log.tags
-                        } else {
+                        }
+                        else
+                        {
                             @('default')
                         }
 

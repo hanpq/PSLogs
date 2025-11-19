@@ -1,5 +1,34 @@
 function Set-LoggingVariables
 {
+    <#
+    .SYNOPSIS
+        Initializes the core PSLogs module variables and data structures
+
+    .DESCRIPTION
+        This function sets up all the essential variables and data structures used by the
+        PSLogs module. It creates logging levels, level name mappings, default configurations,
+        and the main logging hashtable with thread-safe collections for targets and
+        enabled targets. This function is called during module initialization and ensures
+        idempotent operation by checking if variables are already set up.
+
+    .EXAMPLE
+        PS C:\> Set-LoggingVariables
+
+        Initializes all PSLogs module variables if they haven't been set up already
+
+    .NOTES
+        This is an internal initialization function called during module import.
+
+        The function creates:
+        - Logging level constants (NOTSET=0, DEBUG=10, INFO=20, etc.)
+        - LevelNames hashtable for bidirectional level/name mapping
+        - ScriptRoot variable pointing to the module directory
+        - Defaults hashtable with default level, format, and caller scope
+        - Main Logging hashtable with thread-safe concurrent dictionaries
+
+        The function is idempotent - it will return early if variables are already initialized.
+        All collections use thread-safe implementations to support the async logging architecture.
+#>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'Ignored as of now, this is inherited from the original module. This is a internal module cmdlet so the user is not impacted by this.')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Does not alter system state')]
     param()

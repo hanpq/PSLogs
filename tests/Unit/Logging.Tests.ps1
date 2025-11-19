@@ -263,9 +263,9 @@ Describe -Tags Unit 'Performance load' {
         Start-Sleep -Seconds 1
     }
 
-    It 'should be able to handle [light] load' -Skip:($true) {
+    It 'should be able to handle [light] load' {
         [int] $desiredCount = 100
-        [string] $smallLog = [System.IO.Path]::GetTempFileName()
+        [string] $smallLog = Join-Path $TestDrive 'small_log.log'
 
         Add-LoggingTarget -Name File -Configuration @{Path = $smallLog }
 
@@ -275,12 +275,13 @@ Describe -Tags Unit 'Performance load' {
         }
 
         Wait-Logging
+        Start-Sleep -Seconds 1
         (Get-Content $smallLog).Count | Should -Be $desiredCount
     }
 
-    It 'should be able to handle [medium] load' -Skip:($true) {
+    It 'should be able to handle [medium] load' {
         [int] $desiredCount = 1000
-        [string] $mediumLog = [System.IO.Path]::GetTempFileName()
+        [string] $mediumLog = Join-Path $TestDrive 'medium_log.log'
 
         Add-LoggingTarget -Name File -Configuration @{Path = $mediumLog }
 
@@ -290,12 +291,13 @@ Describe -Tags Unit 'Performance load' {
         }
 
         Wait-Logging
+        Start-Sleep -Seconds 1
         (Get-Content $mediumLog).Count | Should -Be $desiredCount
     }
 
-    It 'should be able to handle [high] load' -Skip:($true) {
+    It 'should be able to handle [high] load' {
         [int] $desiredCount = 10000
-        [string] $highLog = [System.IO.Path]::GetTempFileName()
+        [string] $highLog = Join-Path $TestDrive 'high_log.log'
         Add-LoggingTarget -Name File -Configuration @{Path = $highLog; Encoding = 'UTF8' }
 
         for ([int] $lI = 0; $lI -lt $desiredCount; $lI++)
@@ -304,6 +306,7 @@ Describe -Tags Unit 'Performance load' {
         }
 
         Wait-Logging
+        Start-Sleep -Seconds 1
         (Get-Content $highLog).Count | Should -Be $desiredCount
     }
 }
