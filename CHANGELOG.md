@@ -5,10 +5,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added the Ntfy logging target with hosted/self-hosted publishing, Unicode message formatting, titles, priorities, notification tags, and bearer-token authentication.
+- Added the Windows-only OutputDebugString logging target using OutputDebugStringW for Unicode messages. The target silently does nothing on Linux and macOS.
+
 ### Change
 
 - Improved internal function documentation
 - Improved build tests
+- Updated module-scope tests for Pester discovery and corrected platform simulation in the OutputDebugString tests.
+- Isolated OutputDebugString unit tests from native types loaded by earlier test runs in the same PowerShell process.
 
 ## [5.6.1] - 2025-11-19
 

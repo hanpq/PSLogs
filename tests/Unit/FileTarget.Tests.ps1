@@ -1,4 +1,4 @@
-﻿BeforeAll {
+BeforeAll {
 
     $RootItem = Get-Item $PSScriptRoot
     while ($RootItem.GetDirectories().Name -notcontains 'source')
@@ -17,31 +17,29 @@ AfterAll {
     Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 }
 
-InModuleScope 'PSLogs' {
 
-    Describe 'File target' -Tags Targets, TargetFile {
-        AfterEach {
-            $targets = Get-LoggingTarget
-            if ($targets) {
-                $targets.GetEnumerator() | ForEach-Object {
-                    if ($_.Value.UniqueName) {
-                        Remove-LoggingTarget -UniqueName $_.Value.UniqueName
-                    } else {
-                        Remove-LoggingTarget -UniqueName $_.Key
-                    }
+Describe 'File target' -Tags Targets, TargetFile {
+    AfterEach {
+        $targets = Get-LoggingTarget
+        if ($targets) {
+            $targets.GetEnumerator() | ForEach-Object {
+                if ($_.Value.UniqueName) {
+                    Remove-LoggingTarget -UniqueName $_.Value.UniqueName
+                } else {
+                    Remove-LoggingTarget -UniqueName $_.Key
                 }
             }
         }
-        Context 'Old syntax (using Name parameter)' {
-            It 'should resolve relative paths' {
+    }
+    Context 'Old syntax (using Name parameter)' {
+        It 'should resolve relative paths' {
 
-                Add-LoggingTarget -Name File -Configuration @{
-                    Path = '..\Test.log'
-                }
-
-                $a = Get-LoggingTarget
-                $a.Values.Path.Contains('..') | Should -BeFalse
+            Add-LoggingTarget -Name File -Configuration @{
+                Path = '..\Test.log'
             }
+
+            $a = Get-LoggingTarget
+            $a.Values.Path.Contains('..') | Should -BeFalse
         }
     }
 }
