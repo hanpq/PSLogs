@@ -3,6 +3,13 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.6.2-beta002](https://github.com/hanpq/PSLogs/compare/v5.6.2-beta001...v5.6.2-beta002) (2026-10-28)
+
+
+### Bug Fixes
+
+* update Ntfy notification tags to accept ordinary PowerShell arrays and single strings ([920af98](https://github.com/hanpq/PSLogs/commit/920af98c1a7a8314b9f99c291d03bf7e1ab964f3))
+
 ## [5.6.2-beta001](https://github.com/hanpq/PSLogs/compare/v5.6.1...v5.6.2-beta001) (2026-10-28)
 
 
