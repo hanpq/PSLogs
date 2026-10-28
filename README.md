@@ -66,6 +66,41 @@ All options are optional. `Level` and `Format` use the module defaults.
 stack trace when present. Messages are not retained if no debugger or listener is
 listening.
 
+## ntfy target
+
+The cross-platform `Ntfy` target publishes notifications using the
+[ntfy JSON publishing API](https://docs.ntfy.sh/publish/#publish-as-json).
+Only `Topic` is required:
+
+```powershell
+Add-LoggingTarget -Type Ntfy -Configuration @{
+    Topic = 'your-private-topic'
+    Level = 'WARNING'
+    Title = 'PSLogs: %{level}'
+    Priority = 4
+    NotificationTags = [string[]] @('warning', 'computer')
+}
+Write-Log -Level WARNING -Message 'Disk space is low'
+Wait-Logging
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `Topic` | Required | Topic name: letters, numbers, underscores, and hyphens. |
+| `Url` | `https://ntfy.sh` | Server base URL, not a topic URL. Supports self-hosted HTTP/HTTPS servers and base paths. |
+| `Token` | None | Optional ntfy access token, sent using bearer authentication. Use HTTPS to protect it in transit. |
+| `Title` | None | Optional notification title; supports PSLogs format tokens. |
+| `Priority` | `3` | ntfy priority from `1` (minimum) to `5` (maximum). Independent of log-level filtering. |
+| `NotificationTags` | Empty | String array of ntfy tags/emoji names. Separate from PSLogs routing `Tags`. |
+| `Level` | Module default | Minimum PSLogs level to publish. |
+| `Format` | Module default | PSLogs format pattern for the notification message. |
+
+For an authenticated self-hosted server, also supply `Url` and `Token`, for example
+`Url = 'https://ntfy.example.com'; Token = $env:NTFY_TOKEN`. Avoid hard-coding
+tokens in scripts. Choose an unguessable topic or configure access controls, since
+public topics can be read by anyone who knows their name. ntfy server message-size
+limits and rate limits apply; this target does not batch or retry notifications.
+
 ## Docs
 
 Please the full documentation on the [docs site][pslogsdocs]
