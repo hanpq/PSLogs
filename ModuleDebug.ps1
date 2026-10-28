@@ -1,5 +1,5 @@
 ﻿$project = & (Join-Path $PSScriptRoot 'scripts\Get-BuildProject.ps1') -ProjectRoot $PSScriptRoot
-$moduleManifest = Join-Path $PSScriptRoot "output\$($project.Name)\$($project.Version)\$($project.Name).psd1"
+$moduleManifest = Join-Path $PSScriptRoot "output\$($project.Name)\$($project.ModuleVersion)\$($project.Name).psd1"
 
 if (-not (Test-Path -LiteralPath $moduleManifest))
 {

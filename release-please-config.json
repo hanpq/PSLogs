@@ -1,14 +1,11 @@
 {
-  "release-type": "simple",
-  "packages": {
-    ".": {
-      "release-type": "simple",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "source/PSLogs.psd1"
+    "release-type": "simple",
+    "packages": {
+        ".": {
+            "release-type": "simple",
+            "versioning": "prerelease",
+            "prerelease": true,
+            "prerelease-type": "beta001"
         }
-      ]
     }
-  }
 }

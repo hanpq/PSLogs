@@ -17,6 +17,17 @@ jobs:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
 
+      - name: Validate release metadata
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          $project = ./scripts/Assert-ReleaseMetadata.ps1 -Tag $env:RELEASE_TAG -IsPrerelease ([bool]::Parse($env:RELEASE_PRERELEASE))
+          "MODULE_NAME=$($project.Name)" >> $env:GITHUB_ENV
+          "MODULE_VERSION=$($project.Version)" >> $env:GITHUB_ENV
+          "MODULE_PATH=output/$($project.Name)/$($project.ModuleVersion)" >> $env:GITHUB_ENV
+
       - name: Build and test release
         shell: pwsh
         run: ./build.ps1 -Task Test
@@ -24,13 +35,6 @@ jobs:
       - name: Package module
         shell: pwsh
         run: ./build.ps1 -Task Package
-
-      - name: Read module metadata
-        shell: pwsh
-        run: |
-          $project = ./scripts/Get-BuildProject.ps1
-          "MODULE_NAME=$($project.Name)" >> $env:GITHUB_ENV
-          "MODULE_VERSION=$($project.Version)" >> $env:GITHUB_ENV
 
       - name: Publish to PowerShell Gallery
         shell: pwsh
@@ -41,7 +45,7 @@ jobs:
             throw 'The GALLERYAPITOKEN secret is required to publish a release.'
           }
           $version = $env:MODULE_VERSION
-          $modulePath = Join-Path $PWD "output/$env:MODULE_NAME/$version"
+          $modulePath = Join-Path $PWD $env:MODULE_PATH
           try {
             Publish-Module -Path $modulePath -NuGetApiKey $env:GALLERYAPITOKEN -Repository PSGallery -ErrorAction Stop
           }
@@ -70,7 +74,7 @@ jobs:
 
           ./build.ps1 -Task InstallDependencies
           $version = $env:MODULE_VERSION
-          $modulePath = Join-Path $PWD "output/$env:MODULE_NAME/$version"
+          $modulePath = Join-Path $PWD $env:MODULE_PATH
           $manifestPath = Join-Path $modulePath "$env:MODULE_NAME.psd1"
           $manifest = Get-Content -Path $manifestPath
           $manifest = $manifest | Where-Object { $_ -notmatch "^\s*Prerelease\s*=\s*''" }
@@ -109,6 +113,7 @@ jobs:
 
       - name: Check documentation update credentials
         id: docs
+        if: github.event.release.prerelease == false
         shell: pwsh
         env:
           DOCS_GITHUB_TOKEN: ${{ secrets.GITHUBTOKEN }}
@@ -136,4 +141,4 @@ jobs:
         env:
           DOCS_GITHUB_TOKEN: ${{ secrets.GITHUBTOKEN }}
         run: |
-          ./scripts/Update-Docs.ps1 -ModulePath "output/$env:MODULE_NAME/$env:MODULE_VERSION" -DocsRepositoryPath getps.dev
+          ./scripts/Update-Docs.ps1 -ModulePath $env:MODULE_PATH -DocsRepositoryPath getps.dev

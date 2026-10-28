@@ -45,62 +45,6 @@ Wait-Logging        # See Note
 
 When used in *unattended* scripts (scheduled tasks, spawned process) you need to call `Wait-Logging` to avoid loosing messages. If you run your main script in an interactive shell that stays open at the end of the execution you could avoid using it (keep in mind that if there are messeages in the queue when you close the shell, you'll lose them)
 
-## OutputDebugString target
-
-The `OutputDebugString` target sends formatted messages to a Windows debugger or
-debug-output listener such as Sysinternals DebugView using the Unicode
-`OutputDebugStringW` API. On Linux and macOS, the target silently does nothing.
-
-```powershell
-Add-LoggingTarget -Type OutputDebugString -Configuration @{
-    Level = 'DEBUG'
-    Format = '[%{level}] %{message}'
-    PrintException = $true
-}
-Write-Log -Level INFO -Message 'Hello, debugger!'
-Wait-Logging
-```
-
-All options are optional. `Level` and `Format` use the module defaults.
-`PrintException` defaults to `$true` and appends the exception message and script
-stack trace when present. Messages are not retained if no debugger or listener is
-listening.
-
-## ntfy target
-
-The cross-platform `Ntfy` target publishes notifications using the
-[ntfy JSON publishing API](https://docs.ntfy.sh/publish/#publish-as-json).
-Only `Topic` is required:
-
-```powershell
-Add-LoggingTarget -Type Ntfy -Configuration @{
-    Topic = 'your-private-topic'
-    Level = 'WARNING'
-    Title = 'PSLogs: %{level}'
-    Priority = 4
-    NotificationTags = [string[]] @('warning', 'computer')
-}
-Write-Log -Level WARNING -Message 'Disk space is low'
-Wait-Logging
-```
-
-| Option | Default | Description |
-|---|---|---|
-| `Topic` | Required | Topic name: letters, numbers, underscores, and hyphens. |
-| `Url` | `https://ntfy.sh` | Server base URL, not a topic URL. Supports self-hosted HTTP/HTTPS servers and base paths. |
-| `Token` | None | Optional ntfy access token, sent using bearer authentication. Use HTTPS to protect it in transit. |
-| `Title` | None | Optional notification title; supports PSLogs format tokens. |
-| `Priority` | `3` | ntfy priority from `1` (minimum) to `5` (maximum). Independent of log-level filtering. |
-| `NotificationTags` | Empty | String array of ntfy tags/emoji names. Separate from PSLogs routing `Tags`. |
-| `Level` | Module default | Minimum PSLogs level to publish. |
-| `Format` | Module default | PSLogs format pattern for the notification message. |
-
-For an authenticated self-hosted server, also supply `Url` and `Token`, for example
-`Url = 'https://ntfy.example.com'; Token = $env:NTFY_TOKEN`. Avoid hard-coding
-tokens in scripts. Choose an unguessable topic or configure access controls, since
-public topics can be read by anyone who knows their name. ntfy server message-size
-limits and rate limits apply; this target does not batch or retry notifications.
-
 ## Docs
 
 Please the full documentation on the [docs site][pslogsdocs]

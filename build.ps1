@@ -75,23 +75,10 @@ function Get-ModuleVersion
 {
     if ($Version)
     {
-        $moduleVersion = $Version
-    }
-    else
-    {
-        $moduleVersion = (Import-PowerShellDataFile -Path $SourceManifest).ModuleVersion
+        return (& (Join-Path $PSScriptRoot 'scripts\Get-BuildProject.ps1') -ProjectRoot $PSScriptRoot -Version $Version).Version
     }
 
-    try
-    {
-        $null = [version]$moduleVersion
-    }
-    catch
-    {
-        throw "Module version '$moduleVersion' must be a numeric PowerShell module version."
-    }
-
-    return $moduleVersion
+    return $project.Version
 }
 
 function Initialize-BuildDependencies
@@ -194,6 +181,7 @@ function Build-ProjectModule
     )
 
     Write-Host "Building $ModuleName $ModuleVersion from source" -ForegroundColor Cyan
+    Import-BuildModule -Name Configuration
     Import-BuildModule -Name ModuleBuilder
 
     if (Test-Path -LiteralPath $BuiltModuleDirectory)
@@ -204,7 +192,7 @@ function Build-ProjectModule
     $buildParameters = @{
         SourcePath               = $SourceManifest
         OutputDirectory          = $OutputDirectory
-        Version                  = $ModuleVersion
+        SemVer                   = $ModuleVersion
         CopyPaths                = @('en-US', 'include')
         Encoding                 = 'UTF8'
         Prefix                   = 'prefix.ps1'
@@ -214,7 +202,8 @@ function Build-ProjectModule
 
     Build-Module @buildParameters | Out-Host
 
-    $modulePath = Join-Path (Join-Path $BuiltModuleDirectory $ModuleVersion) "$ModuleName.psd1"
+    $numericVersion = $ModuleVersion.Split('-')[0]
+    $modulePath = Join-Path (Join-Path $BuiltModuleDirectory $numericVersion) "$ModuleName.psd1"
     if (-not (Test-Path -LiteralPath $modulePath))
     {
         throw "ModuleBuilder did not create the expected module manifest: $modulePath"
@@ -243,7 +232,15 @@ function Build-ProjectModule
         throw "Could not find release notes for $ModuleName $ModuleVersion in CHANGELOG.md."
     }
 
-    Update-ModuleManifest -Path $modulePath -ReleaseNotes $releaseNotesMatch.Groups['notes'].Value.Trim() -ErrorAction Stop
+    Update-Metadata -Path $modulePath -PropertyName PrivateData.PSData.ReleaseNotes -Value $releaseNotesMatch.Groups['notes'].Value.Trim() -ErrorAction Stop
+
+    $builtManifest = Import-PowerShellDataFile -LiteralPath $modulePath
+    $expectedPrerelease = ($ModuleVersion -split '-', 2 | Select-Object -Skip 1) -join ''
+    if ($builtManifest.ModuleVersion -ne $numericVersion -or
+        [string]$builtManifest.PrivateData.PSData.Prerelease -cne $expectedPrerelease)
+    {
+        throw "The built manifest does not match the requested release version '$ModuleVersion'."
+    }
 
     Write-Host "Module built successfully: $(Split-Path -Parent $modulePath)" -ForegroundColor Green
     return (Split-Path -Parent $modulePath)
@@ -301,10 +298,23 @@ function New-ModulePackage
         $ModuleVersion
     )
 
-    $modulePath = Join-Path $BuiltModuleDirectory $ModuleVersion
+    $modulePath = Join-Path $BuiltModuleDirectory $ModuleVersion.Split('-')[0]
     $packagePath = Join-Path $OutputDirectory "$ModuleName.$ModuleVersion.zip"
+    $manifestPath = Join-Path $modulePath "$ModuleName.psd1"
+    $requiresBuild = -not (Test-Path -LiteralPath $manifestPath)
 
-    if (-not (Test-Path -LiteralPath (Join-Path $modulePath "$ModuleName.psd1")))
+    if (-not $requiresBuild)
+    {
+        $manifest = Import-PowerShellDataFile -LiteralPath $manifestPath
+        $builtVersion = [string]$manifest.ModuleVersion
+        if ($manifest.PrivateData.PSData.Prerelease)
+        {
+            $builtVersion += "-$($manifest.PrivateData.PSData.Prerelease)"
+        }
+        $requiresBuild = $builtVersion -cne $ModuleVersion
+    }
+
+    if ($requiresBuild)
     {
         $modulePath = Build-ProjectModule -ModuleVersion $ModuleVersion
     }

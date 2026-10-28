@@ -2,7 +2,7 @@ BeforeAll {
     $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     $buildScript = Join-Path $projectRoot 'build.ps1'
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($buildScript, [ref]$null, [ref]$null)
-    foreach ($functionName in @('Import-BuildModule', 'Invoke-ModuleTests', 'New-ModulePackage'))
+    foreach ($functionName in @('Import-BuildModule', 'Build-ProjectModule', 'Invoke-ModuleTests', 'New-ModulePackage'))
     {
         $definition = $ast.Find({
             param($node)
@@ -22,7 +22,10 @@ BeforeAll {
 Describe 'Module metadata discovery' {
     BeforeAll {
         $metadataScript = Join-Path $projectRoot 'scripts\Get-BuildProject.ps1'
-        $fixtureRoot = Join-Path $TestDrive 'ExampleProject'
+    }
+
+    BeforeEach {
+        $fixtureRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString())
         $fixtureSource = Join-Path $fixtureRoot 'source'
         New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3' }"
@@ -42,18 +45,90 @@ Describe 'Module metadata discovery' {
         { & $metadataScript -ProjectRoot $fixtureRoot } |
             Should -Throw '*exactly one module manifest*'
     }
+
+    It 'splits a tracked prerelease into PowerShell manifest fields' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
+
+        $project = & $metadataScript -ProjectRoot $fixtureRoot
+
+        $project.Version | Should -Be '1.3.0-beta001'
+        $project.ModuleVersion | Should -Be '1.3.0'
+        $project.Prerelease | Should -Be 'beta001'
+    }
+
+    It 'allows a local version override without changing the tracked version' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.2.3"}'
+
+        $project = & $metadataScript -ProjectRoot $fixtureRoot -Version '1.3.0-beta002'
+
+        $project.Version | Should -Be '1.3.0-beta002'
+        (& $metadataScript -ProjectRoot $fixtureRoot).Version | Should -Be '1.2.3'
+    }
+
+    It 'keeps stable releases free of a prerelease suffix' {
+        $project = & $metadataScript -ProjectRoot $fixtureRoot -Version '1.3.0'
+
+        $project.ModuleVersion | Should -Be '1.3.0'
+        $project.Prerelease | Should -BeNullOrEmpty
+    }
+
+    It 'reads prerelease metadata from an untracked source template' {
+        Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3'; PrivateData = @{ PSData = @{ Prerelease = 'beta001' } } }"
+
+        $project = & $metadataScript -ProjectRoot $fixtureRoot
+
+        $project.Version | Should -Be '1.2.3-beta001'
+        $project.ModuleVersion | Should -Be '1.2.3'
+    }
+
+    It 'rejects unsupported version <ReleaseVersion>' -ForEach @(
+        @{ ReleaseVersion = '1.3.0-beta.1' }
+        @{ ReleaseVersion = '1.3.0+build123' }
+        @{ ReleaseVersion = '1.3' }
+        @{ ReleaseVersion = '01.3.0' }
+        @{ ReleaseVersion = 'invalid' }
+    ) {
+        { & $metadataScript -ProjectRoot $fixtureRoot -Version $ReleaseVersion } |
+            Should -Throw '*Invalid release version*'
+    }
+
+    It 'rejects a tracking manifest without the root package version' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{}'
+
+        { & $metadataScript -ProjectRoot $fixtureRoot } | Should -Throw '*Invalid release version*'
+    }
 }
 
 Describe 'Module packaging' {
-    It 'creates a package for a differently named module' {
+    It 'rebuilds rather than packaging a different release from the same numeric directory' {
         $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
         $moduleDirectory = Join-Path $BuiltModuleDirectory '1.2.3'
         New-Item -ItemType Directory -Path $moduleDirectory -Force | Out-Null
-        Set-Content -LiteralPath (Join-Path $moduleDirectory "$ModuleName.psd1") -Value "@{ ModuleVersion = '1.2.3' }"
+        $manifestPath = Join-Path $moduleDirectory "$ModuleName.psd1"
+        Set-Content -LiteralPath $manifestPath -Value "@{ ModuleVersion = '1.2.3' }"
+        Mock Build-ProjectModule {
+            Set-Content -LiteralPath $manifestPath -Value "@{ ModuleVersion = '1.2.3'; PrivateData = @{ PSData = @{ Prerelease = 'beta001' } } }"
+            $moduleDirectory
+        }
 
-        New-ModulePackage -ModuleVersion '1.2.3'
+        New-ModulePackage -ModuleVersion '1.2.3-beta001'
 
-        $package = Join-Path $OutputDirectory 'ExampleModule.1.2.3.zip'
+        Should -Invoke Build-ProjectModule -Times 1 -Exactly -ParameterFilter { $ModuleVersion -eq '1.2.3-beta001' }
+    }
+
+    It 'creates a package for a differently named module at <ReleaseVersion>' -ForEach @(
+        @{ ReleaseVersion = '1.2.3'; Label = '' }
+        @{ ReleaseVersion = '1.2.3-beta001'; Label = 'beta001' }
+        @{ ReleaseVersion = '1.2.3-beta002'; Label = 'beta002' }
+    ) {
+        $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
+        $moduleDirectory = Join-Path $BuiltModuleDirectory '1.2.3'
+        New-Item -ItemType Directory -Path $moduleDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $moduleDirectory "$ModuleName.psd1") -Value "@{ ModuleVersion = '1.2.3'; PrivateData = @{ PSData = @{ Prerelease = '$Label' } } }"
+
+        New-ModulePackage -ModuleVersion $ReleaseVersion
+
+        $package = Join-Path $OutputDirectory "ExampleModule.$ReleaseVersion.zip"
         Test-Path -LiteralPath $package | Should -BeTrue
         $archive = [System.IO.Compression.ZipFile]::OpenRead($package)
         try
@@ -64,6 +139,67 @@ Describe 'Module packaging' {
         {
             $archive.Dispose()
         }
+    }
+}
+
+Describe 'Release publication guards' {
+    BeforeAll {
+        $assertScript = Join-Path $projectRoot 'scripts\Assert-ReleaseMetadata.ps1'
+    }
+
+    BeforeEach {
+        $fixtureRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        $fixtureSource = Join-Path $fixtureRoot 'source'
+        New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3' }"
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
+        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{"prerelease":true}}}'
+    }
+
+    It 'accepts a matching prerelease' {
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true
+
+        $project.Version | Should -Be '1.3.0-beta001'
+    }
+
+    It 'accepts promotion to the same numeric stable version' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
+        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{"prerelease":false}}}'
+
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false
+
+        $project.Version | Should -Be '1.3.0'
+    }
+
+    It 'rejects a tag that disagrees with the package version' {
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta002' -IsPrerelease $true } |
+            Should -Throw '*tag*does not match*'
+    }
+
+    It 'rejects a prerelease incorrectly marked stable on GitHub' {
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $false } |
+            Should -Throw '*GitHub prerelease flag*'
+    }
+
+    It 'rejects a stable package incorrectly marked as a GitHub prerelease' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $true } |
+            Should -Throw '*GitHub prerelease flag*'
+    }
+
+    It 'rejects a stable release while prerelease mode is enabled' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false } |
+            Should -Throw '*Release Please prerelease mode*'
+    }
+
+    It 'rejects a missing release mode rather than assuming stable' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{}}}'
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true } |
+            Should -Throw '*explicitly configure a boolean prerelease mode*'
     }
 }
 

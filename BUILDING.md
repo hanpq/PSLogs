@@ -24,9 +24,9 @@ The default `Verify` task builds the module from `source/` into `output/PSLogs/<
 
 The build prints progress messages for dependency checks, module compilation, tests, packaging, and cleanup, including the relevant output paths. A successful task ends with a completion message; failed tasks report an error instead.
 
-The build infrastructure discovers the module name and version from the single module manifest directly under `source/`, using `scripts/Get-BuildProject.ps1`. Output directories, package names, test report names, release publishing, and generated documentation use that identity rather than a hard-coded project name. The reusable build steps are `Build-ProjectModule`, `Invoke-ModuleTests`, and `New-ModulePackage`; their order is defined in the `switch ($Task)` block at the bottom of `build.ps1`.
+The build infrastructure discovers the module name from the single module manifest directly under `source/`, using `scripts/Get-BuildProject.ps1`. The release version comes from the root (`"."`) entry in `.release-please-manifest.json`. In a repository without that tracking file, it uses the source manifest's version and prerelease metadata instead. An existing but invalid tracking file fails the build. Output directories, package names, test report names, release publishing, and generated documentation use that identity rather than a hard-coded project name. The reusable build steps are `Build-ProjectModule`, `Invoke-ModuleTests`, and `New-ModulePackage`; their order is defined in the `switch ($Task)` block at the bottom of `build.ps1`.
 
-When reusing the infrastructure in another repository, keep the same source layout and update repository configuration such as the manifest path in `release-please-config.json`, the documentation destination in the release workflow, and GitHub secrets. The module's own source and functional tests remain project-specific.
+When reusing the infrastructure in another repository, keep the same source layout and update repository configuration such as the starting version in `.release-please-manifest.json`, the documentation destination in the release workflow, and GitHub secrets. The module's own source and functional tests remain project-specific.
 
 Use the module locally by importing the manifest under `output/PSLogs/<version>/`. Do not edit generated files there; make changes under `source/` and rebuild.
 
@@ -55,11 +55,46 @@ Merging a feature pull request to `main` does not publish a release. Several fea
 
 The Release Please workflow watches `main` and opens or updates a release pull request when Conventional Commits request a version bump. Review and merge that pull request to create the version tag and GitHub release. The release workflow then builds and tests that tag, attaches a ZIP package to the GitHub release, and publishes the module to the PowerShell Gallery.
 
-The release pull request adds a versioned section with generated release notes to `CHANGELOG.md` and updates the version in both `source/PSLogs.psd1` and `.release-please-manifest.json`. Notes are generated from the Conventional Commit messages that land on `main`, so make those messages clear and user-focused. Non-release commits such as `docs:` and `chore:` do not appear in the generated release notes.
+The release pull request adds a versioned section with generated release notes to `CHANGELOG.md` and updates `.release-please-manifest.json` and the simple strategy's `version.txt`. The tracking manifest is the build's release-version authority; `version.txt` is maintained by Release Please, not edited manually. The source module manifest remains a valid numeric-version template, not the current release-version authority. The build writes the tracked numeric version and prerelease label into the generated manifest. This avoids putting an invalid value such as `5.7.0-beta001` into the source manifest's numeric `ModuleVersion` field. Notes are generated from the Conventional Commit messages that land on `main`, so make those messages clear and user-focused. Non-release commits such as `docs:` and `chore:` do not appear in the generated release notes.
 
 Existing bullets under `## [Unreleased]` are not inputs to Release Please. It generates notes from commits, adds the new version section above the existing changelog headings, and leaves the current `Unreleased` bullets where they are. In particular, bullets already there will not automatically move into the release section; they can remain under `Unreleased` even after the changes they describe have shipped.
 
-Before merging a release pull request, compare its generated notes with the existing `Unreleased` bullets. If a bullet describes a change included in the release but is missing from the generated notes, add or move it into the release section on the release pull request, then remove it from `Unreleased`. Remove stale bullets that have already shipped. Review these edits after the bot's last update, because a later update may regenerate the release pull request. For future changes, use clear Conventional Commit messages so generated release notes include them automatically. Do not edit the `.release-please-manifest.json` version manually during routine development. For an intentional release-version correction, update that manifest and the module manifest together.
+Before merging a release pull request, compare its generated notes with the existing `Unreleased` bullets. If a bullet describes a change included in the release but is missing from the generated notes, add or move it into the release section on the release pull request, then remove it from `Unreleased`. Remove stale bullets that have already shipped. Review these edits after the bot's last update, because a later update may regenerate the release pull request. For future changes, use clear Conventional Commit messages so generated release notes include them automatically. Do not edit the `.release-please-manifest.json` version manually during routine development. For an intentional next-version override, use Release Please's `release-as` setting, then remove it after that release so it does not pin subsequent releases.
+
+### Prereleases on main
+
+No separate beta branch or manual publishing workflow is needed. Release Please uses its `prerelease` versioning strategy for both beta releases and promotion to stable. Stable mode is the default:
+
+```json
+"versioning": "prerelease",
+"prerelease": false,
+"prerelease-type": "beta001"
+```
+
+To publish previews of the next release:
+
+1. Develop on feature branches and squash-merge their PRs into `main` as usual. Do not merge the pending release PR yet.
+2. In a normal configuration PR, change `packages["."].prerelease` to `true` in `release-please-config.json`. Leave `versioning` set to `"prerelease"` and the initial suffix set to `"beta001"`.
+3. Merge that configuration PR. Release Please updates the pending release PR to a prerelease, for example `5.7.0-beta001` after a feature change from `5.6.1`.
+4. Review the release PR's version and changelog, let CI pass, then merge it. That authorizes publication to GitHub, the Gallery, and optional ProGet.
+5. Merge further fixes through normal PRs. Merge the next release PR when ready to publish `5.7.0-beta002`, and repeat as needed.
+
+If there are no unreleased feature/fix commits yet, use a release-worthy configuration PR title such as `fix: prepare prerelease validation` to request a release. A `chore:` configuration change alone does not necessarily create a release PR.
+
+To promote the tested version to stable, change only `prerelease` back to `false` in a configuration PR, with a squash title such as `fix: promote tested version to stable`. Keep the `"prerelease"` versioning strategy: for a fix-only promotion from `5.7.0-beta002`, it selects `5.7.0`, not `5.7.1`. Review and merge the resulting stable release PR. New features or breaking changes during a beta cycle can change the target numeric version; always inspect the proposed version. If an exact target is needed, set `"release-as": "5.7.0"` (or a full beta version) in the root package configuration, then remove that override after publication.
+
+Numbered labels use `beta001`, `beta002`, etc. rather than `beta.1`: dotted prerelease labels are incompatible with the PowerShell Gallery format supported here. Release Please increments the existing number, preserving its padding. The generated manifest contains numeric `ModuleVersion = '5.7.0'` plus `PrivateData.PSData.Prerelease = 'beta001'`. The module directory stays numeric (`output/PSLogs/5.7.0/`) for PowerShell auto-loading, while ZIP names include the full identity (`PSLogs.5.7.0-beta001.zip`).
+
+Keep an empty `PrivateData.PSData.Prerelease = ''` entry in the source manifest template so ModuleBuilder can populate it. The build verifies the generated version and prerelease metadata and fails if they do not match the requested release.
+
+Try a prerelease locally without changing tracked files:
+
+```powershell
+./build.ps1 -Task Test -Version 5.7.0-beta001
+./build.ps1 -Task Package -Version 5.7.0-beta001
+```
+
+These commands do not publish anything. The release workflow checks that the tag, tracked version, GitHub prerelease flag, and configured release mode agree before building or publishing. Do not publish a manually marked GitHub prerelease with stable package metadata. Prereleases skip updates to the public documentation site; stable releases retain the existing documentation behavior. Gallery users must explicitly opt in, for example `Install-Module PSLogs -AllowPrerelease`.
 
 ### GitHub configuration
 
