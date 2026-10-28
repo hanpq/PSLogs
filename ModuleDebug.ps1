@@ -1,4 +1,12 @@
-﻿Import-Module 'D:\Repos\PSLogs\output\PSLogs' -Force
+﻿$moduleVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'source\PSLogs.psd1')).ModuleVersion
+$moduleManifest = Join-Path $PSScriptRoot "output\PSLogs\$moduleVersion\PSLogs.psd1"
+
+if (-not (Test-Path -LiteralPath $moduleManifest))
+{
+    throw "Built PSLogs manifest not found at '$moduleManifest'. Run './build.ps1 -Task Build' first."
+}
+
+Import-Module $moduleManifest -Force
 
 function Log
 {

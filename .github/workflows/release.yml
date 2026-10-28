@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Build and test release
+        shell: pwsh
+        run: ./build.ps1 -Task Test
+
+      - name: Package module
+        shell: pwsh
+        run: ./build.ps1 -Task Package
+
+      - name: Publish to PowerShell Gallery
+        shell: pwsh
+        env:
+          GALLERYAPITOKEN: ${{ secrets.GALLERYAPITOKEN }}
+        run: |
+          if (-not $env:GALLERYAPITOKEN) {
+            throw 'The GALLERYAPITOKEN secret is required to publish a release.'
+          }
+          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
+          $modulePath = Join-Path $PWD "output/PSLogs/$version"
+          try {
+            Publish-Module -Path $modulePath -NuGetApiKey $env:GALLERYAPITOKEN -Repository PSGallery -ErrorAction Stop
+          }
+          catch {
+            if ($_.Exception.Message -like '*is already available in the repository*') {
+              Write-Host "PSLogs $version is already available in the PowerShell Gallery."
+            }
+            else {
+              throw
+            }
+          }
+
+      - name: Publish to ProGet
+        shell: pwsh
+        env:
+          PSTOOLS_APITOKEN: ${{ secrets.PSTOOLS_APITOKEN }}
+          PSTOOLS_SOURCE: ${{ secrets.PSTOOLS_SOURCE }}
+        run: |
+          if (-not $env:PSTOOLS_APITOKEN) {
+            Write-Host 'ProGet publishing skipped; PSTOOLS_APITOKEN is not configured.'
+            exit 0
+          }
+          if (-not $env:PSTOOLS_SOURCE) {
+            throw 'PSTOOLS_SOURCE must be configured when ProGet publishing is enabled.'
+          }
+
+          ./build.ps1 -Task InstallDependencies
+          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
+          $modulePath = Join-Path $PWD "output/PSLogs/$version"
+          $manifestPath = Join-Path $modulePath 'PSLogs.psd1'
+          $manifest = Get-Content -Path $manifestPath
+          $manifest = $manifest | Where-Object { $_ -notmatch "^\s*Prerelease\s*=\s*''" }
+          Set-Content -Path $manifestPath -Value $manifest -Encoding UTF8
+
+          $modulePathRoot = Join-Path $PWD 'output/RequiredModules'
+          $env:PSModulePath = $modulePathRoot + [IO.Path]::PathSeparator + $env:PSModulePath
+          Import-Module Microsoft.PowerShell.PSResourceGet -RequiredVersion 1.2.0 -ErrorAction Stop
+
+          $repositoryName = 'PSLogs-ProGet'
+          try {
+            Register-PSResourceRepository -Name $repositoryName -Uri $env:PSTOOLS_SOURCE -Trusted -ErrorAction Stop
+            Set-PSResourceRepository -Name $repositoryName -ApiVersion nugetServer -ErrorAction Stop
+            try {
+              Publish-PSResource -ApiKey $env:PSTOOLS_APITOKEN -Path $modulePath -Repository $repositoryName -SkipDependenciesCheck -ErrorAction Stop
+            }
+            catch {
+              if ($_.Exception.Message -like '*is already available in the repository*') {
+                Write-Host "PSLogs $version is already available in ProGet."
+              }
+              else {
+                throw
+              }
+            }
+          }
+          finally {
+            Unregister-PSResourceRepository -Name $repositoryName -Confirm:$false -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload GitHub release package
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
+          gh release upload $env:GITHUB_REF_NAME "output/PSLogs.$version.zip" --clobber
+
+      - name: Check documentation update credentials
+        id: docs
+        shell: pwsh
+        env:
+          DOCS_GITHUB_TOKEN: ${{ secrets.GITHUBTOKEN }}
+        run: |
+          if ($env:DOCS_GITHUB_TOKEN) {
+            "enabled=true" >> $env:GITHUB_OUTPUT
+          }
+          else {
+            Write-Host 'Documentation update skipped; GITHUBTOKEN is not configured.'
+            "enabled=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Check out getps.dev
+        if: steps.docs.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: hanpq/getps.dev
+          ref: main
+          path: getps.dev
+          token: ${{ secrets.GITHUBTOKEN }}
+
+      - name: Update getps.dev documentation
+        if: steps.docs.outputs.enabled == 'true'
+        shell: pwsh
+        env:
+          DOCS_GITHUB_TOKEN: ${{ secrets.GITHUBTOKEN }}
+        run: |
+          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
+          ./scripts/Update-Docs.ps1 -ModulePath "output/PSLogs/$version" -DocsRepositoryPath getps.dev
