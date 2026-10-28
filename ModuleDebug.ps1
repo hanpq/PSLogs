@@ -1,9 +1,9 @@
-﻿$moduleVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'source\PSLogs.psd1')).ModuleVersion
-$moduleManifest = Join-Path $PSScriptRoot "output\PSLogs\$moduleVersion\PSLogs.psd1"
+﻿$project = & (Join-Path $PSScriptRoot 'scripts\Get-BuildProject.ps1') -ProjectRoot $PSScriptRoot
+$moduleManifest = Join-Path $PSScriptRoot "output\$($project.Name)\$($project.Version)\$($project.Name).psd1"
 
 if (-not (Test-Path -LiteralPath $moduleManifest))
 {
-    throw "Built PSLogs manifest not found at '$moduleManifest'. Run './build.ps1 -Task Build' first."
+    throw "Built module manifest not found at '$moduleManifest'. Run './build.ps1 -Task Build' first."
 }
 
 Import-Module $moduleManifest -Force
@@ -105,4 +105,4 @@ Write-Host
 Wait-Logging
 
 
-Remove-Module PSLogs
+Remove-Module $project.Name

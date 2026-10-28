@@ -16,6 +16,8 @@ param
 
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
+$project = & (Join-Path $PSScriptRoot 'Get-BuildProject.ps1') -ProjectRoot $ProjectRoot
+$moduleName = $project.Name
 
 foreach ($pathVariable in @('ModulePath', 'DocsRepositoryPath'))
 {
@@ -56,10 +58,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $DocsRepositoryPath '.git')))
     throw "Documentation repository was not checked out at '$DocsRepositoryPath'."
 }
 
-$moduleManifest = Join-Path $ModulePath 'PSLogs.psd1'
+$moduleManifest = Join-Path $ModulePath "$moduleName.psd1"
 if (-not (Test-Path -LiteralPath $moduleManifest))
 {
-    throw "Built PSLogs manifest not found at '$moduleManifest'."
+    throw "Built $moduleName manifest not found at '$moduleManifest'."
 }
 
 & (Join-Path $ProjectRoot 'build.ps1') -Task InstallDependencies -OutputDirectory $OutputDirectory
@@ -74,18 +76,18 @@ $docsModulesPath = Join-Path $DocsRepositoryPath 'docs\modules'
 New-Item -ItemType Directory -Path $docsModulesPath -Force | Out-Null
 
 $docuSplat = @{
-    Module          = 'PSLogs'
+    Module          = $moduleName
     DocsFolder      = $docsModulesPath
-    Sidebar         = 'PSLogs/03-Command Reference'
+    Sidebar         = "$moduleName/03-Command Reference"
     MetaDescription = 'Help page for the Powershell "%1" command'
-    MetaKeywords    = @('Powershell', 'PSLogs', 'Help', 'Documentation')
+    MetaKeywords    = @('Powershell', $moduleName, 'Help', 'Documentation')
     AppendMarkdown  = '## EDIT THIS DOC' + "`n`n" +
-        'This page was auto-generated from the powershell command comment based help. To edit the content of this page, update the script file comment based help on github [Github](https://github.com/hanpq/PSLogs)'
+        'This page was auto-generated from PowerShell comment-based help. To edit this page, update the corresponding command help in the module source repository.'
 }
 New-DocusaurusHelp @docuSplat -ErrorAction Stop -WarningAction SilentlyContinue
 Remove-Module -Name $module.Name -Force -ErrorAction Stop
 
-$destinationModulePath = Join-Path $docsModulesPath 'PSLogs'
+$destinationModulePath = Join-Path $docsModulesPath $moduleName
 if (-not (Test-Path -LiteralPath $destinationModulePath))
 {
     throw "Documentation generator did not create '$destinationModulePath'."
@@ -100,13 +102,13 @@ title: Changelog
 ---
 
 '@
-$getStartedPrefix = @'
+$getStartedPrefix = @"
 ---
-id: PSLogs
-title: PSLogs
+id: $moduleName
+title: $moduleName
 ---
 
-'@
+"@
 
 $changelog = [System.IO.File]::ReadAllText($changelogPath)
 $changelog = [regex]::Replace($changelog, '(?<!\\)([{}])', '\$1')
@@ -119,7 +121,7 @@ $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
     $utf8NoBom
 )
 [System.IO.File]::WriteAllText(
-    (Join-Path $destinationModulePath 'PSLogs.md'),
+    (Join-Path $destinationModulePath "$moduleName.md"),
     $getStartedPrefix + $readme,
     $utf8NoBom
 )
@@ -134,7 +136,7 @@ git -C $DocsRepositoryPath config user.name 'github-actions[bot]'
 if ($LASTEXITCODE -ne 0) { throw 'Could not configure the documentation commit user name.' }
 git -C $DocsRepositoryPath config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 if ($LASTEXITCODE -ne 0) { throw 'Could not configure the documentation commit email.' }
-git -C $DocsRepositoryPath add -- 'docs/modules/PSLogs'
+git -C $DocsRepositoryPath add -- "docs/modules/$moduleName"
 if ($LASTEXITCODE -ne 0) { throw 'Could not stage generated documentation.' }
 
 git -C $DocsRepositoryPath diff --cached --quiet
@@ -149,9 +151,9 @@ if ($LASTEXITCODE -ne 1)
 }
 
 $moduleVersion = (Import-PowerShellDataFile -Path $moduleManifest).ModuleVersion
-git -C $DocsRepositoryPath commit -m "docs: update PSLogs documentation for $moduleVersion"
+git -C $DocsRepositoryPath commit -m "docs: update $moduleName documentation for $moduleVersion"
 if ($LASTEXITCODE -ne 0) { throw 'Could not commit generated documentation.' }
 git -C $DocsRepositoryPath push origin HEAD:main
 if ($LASTEXITCODE -ne 0) { throw 'Could not push generated documentation to getps.dev.' }
 
-Write-Host "Updated getps.dev documentation for PSLogs $moduleVersion."
+Write-Host "Updated getps.dev documentation for $moduleName $moduleVersion."

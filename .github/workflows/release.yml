@@ -25,6 +25,13 @@ jobs:
         shell: pwsh
         run: ./build.ps1 -Task Package
 
+      - name: Read module metadata
+        shell: pwsh
+        run: |
+          $project = ./scripts/Get-BuildProject.ps1
+          "MODULE_NAME=$($project.Name)" >> $env:GITHUB_ENV
+          "MODULE_VERSION=$($project.Version)" >> $env:GITHUB_ENV
+
       - name: Publish to PowerShell Gallery
         shell: pwsh
         env:
@@ -33,14 +40,14 @@ jobs:
           if (-not $env:GALLERYAPITOKEN) {
             throw 'The GALLERYAPITOKEN secret is required to publish a release.'
           }
-          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
-          $modulePath = Join-Path $PWD "output/PSLogs/$version"
+          $version = $env:MODULE_VERSION
+          $modulePath = Join-Path $PWD "output/$env:MODULE_NAME/$version"
           try {
             Publish-Module -Path $modulePath -NuGetApiKey $env:GALLERYAPITOKEN -Repository PSGallery -ErrorAction Stop
           }
           catch {
             if ($_.Exception.Message -like '*is already available in the repository*') {
-              Write-Host "PSLogs $version is already available in the PowerShell Gallery."
+              Write-Host "$env:MODULE_NAME $version is already available in the PowerShell Gallery."
             }
             else {
               throw
@@ -62,9 +69,9 @@ jobs:
           }
 
           ./build.ps1 -Task InstallDependencies
-          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
-          $modulePath = Join-Path $PWD "output/PSLogs/$version"
-          $manifestPath = Join-Path $modulePath 'PSLogs.psd1'
+          $version = $env:MODULE_VERSION
+          $modulePath = Join-Path $PWD "output/$env:MODULE_NAME/$version"
+          $manifestPath = Join-Path $modulePath "$env:MODULE_NAME.psd1"
           $manifest = Get-Content -Path $manifestPath
           $manifest = $manifest | Where-Object { $_ -notmatch "^\s*Prerelease\s*=\s*''" }
           Set-Content -Path $manifestPath -Value $manifest -Encoding UTF8
@@ -73,7 +80,7 @@ jobs:
           $env:PSModulePath = $modulePathRoot + [IO.Path]::PathSeparator + $env:PSModulePath
           Import-Module Microsoft.PowerShell.PSResourceGet -RequiredVersion 1.2.0 -ErrorAction Stop
 
-          $repositoryName = 'PSLogs-ProGet'
+          $repositoryName = 'ModuleRelease-ProGet'
           try {
             Register-PSResourceRepository -Name $repositoryName -Uri $env:PSTOOLS_SOURCE -Trusted -ErrorAction Stop
             Set-PSResourceRepository -Name $repositoryName -ApiVersion nugetServer -ErrorAction Stop
@@ -82,7 +89,7 @@ jobs:
             }
             catch {
               if ($_.Exception.Message -like '*is already available in the repository*') {
-                Write-Host "PSLogs $version is already available in ProGet."
+                Write-Host "$env:MODULE_NAME $version is already available in ProGet."
               }
               else {
                 throw
@@ -98,8 +105,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
-          gh release upload $env:GITHUB_REF_NAME "output/PSLogs.$version.zip" --clobber
+          gh release upload $env:GITHUB_REF_NAME "output/$env:MODULE_NAME.$env:MODULE_VERSION.zip" --clobber
 
       - name: Check documentation update credentials
         id: docs
@@ -130,5 +136,4 @@ jobs:
         env:
           DOCS_GITHUB_TOKEN: ${{ secrets.GITHUBTOKEN }}
         run: |
-          $version = (Import-PowerShellDataFile source/PSLogs.psd1).ModuleVersion
-          ./scripts/Update-Docs.ps1 -ModulePath "output/PSLogs/$version" -DocsRepositoryPath getps.dev
+          ./scripts/Update-Docs.ps1 -ModulePath "output/$env:MODULE_NAME/$env:MODULE_VERSION" -DocsRepositoryPath getps.dev

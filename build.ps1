@@ -12,10 +12,43 @@ param
 
     [Parameter()]
     [string]
-    $OutputDirectory
+    $OutputDirectory,
+
+    [Parameter(DontShow)]
+    [switch]
+    $InBuildProcess
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $InBuildProcess)
+{
+    Write-Host "Starting build process with task [$($Task.ToLowerInvariant())]" -ForegroundColor Cyan
+    Write-Host 'Using a fresh PowerShell process to keep build dependencies isolated.'
+    $executableName = if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' }
+        elseif ($env:OS -eq 'Windows_NT') { 'pwsh.exe' }
+        else { 'pwsh' }
+    $executable = Join-Path $PSHOME $executableName
+    $arguments = @('-NoProfile', '-NonInteractive', '-File', $PSCommandPath, '-InBuildProcess', '-Task', $Task)
+
+    if ($PSBoundParameters.ContainsKey('Version'))
+    {
+        $arguments += @('-Version', $Version)
+    }
+
+    if ($PSBoundParameters.ContainsKey('OutputDirectory'))
+    {
+        $arguments += @('-OutputDirectory', $OutputDirectory)
+    }
+
+    & $executable @arguments
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "The '$Task' build task failed in the isolated PowerShell process (exit code $LASTEXITCODE). See the output above for details."
+    }
+
+    return
+}
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory))
 {
@@ -31,9 +64,11 @@ else
     $OutputDirectory = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot $OutputDirectory))
 }
 $RequiredModulesDirectory = Join-Path $OutputDirectory 'RequiredModules'
-$BuiltModuleDirectory = Join-Path $OutputDirectory 'PSLogs'
+$project = & (Join-Path $PSScriptRoot 'scripts\Get-BuildProject.ps1') -ProjectRoot $PSScriptRoot
+$ModuleName = $project.Name
+$BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
 $TestResultsDirectory = Join-Path $OutputDirectory 'testResults'
-$SourceManifest = Join-Path $PSScriptRoot 'source\PSLogs.psd1'
+$SourceManifest = $project.SourceManifest
 $DependencyManifest = Join-Path $PSScriptRoot 'RequiredModules.psd1'
 
 function Get-ModuleVersion
@@ -67,6 +102,7 @@ function Initialize-BuildDependencies
         $IncludeDocumentation
     )
 
+    Write-Host 'Checking module dependencies' -ForegroundColor Cyan
     $dependencyGroups = Import-PowerShellDataFile -Path $DependencyManifest
     $dependencies = @{}
 
@@ -96,6 +132,7 @@ function Initialize-BuildDependencies
 
         if (Test-Path -LiteralPath $modulePath)
         {
+            Write-Host "  Ready: $moduleName $moduleVersion"
             $dependencyPaths += $modulePath
             continue
         }
@@ -124,6 +161,7 @@ function Initialize-BuildDependencies
             Where-Object { $_ -and $_ -ne $RequiredModulesDirectory }
     )
     $env:PSModulePath = $modulePaths -join [System.IO.Path]::PathSeparator
+    Write-Host 'Module dependencies are ready.' -ForegroundColor Green
 }
 
 function Import-BuildModule
@@ -142,10 +180,11 @@ function Import-BuildModule
         $moduleVersion = $dependencyGroups.Publish[$Name]
     }
 
-    Import-Module -Name $Name -RequiredVersion $moduleVersion -ErrorAction Stop
+    $moduleManifest = Join-Path (Join-Path (Join-Path $RequiredModulesDirectory $Name) $moduleVersion) "$Name.psd1"
+    Import-Module -Name $moduleManifest -Global -ErrorAction Stop
 }
 
-function Build-PSLogs
+function Build-ProjectModule
 {
     param
     (
@@ -154,6 +193,7 @@ function Build-PSLogs
         $ModuleVersion
     )
 
+    Write-Host "Building $ModuleName $ModuleVersion from source" -ForegroundColor Cyan
     Import-BuildModule -Name ModuleBuilder
 
     if (Test-Path -LiteralPath $BuiltModuleDirectory)
@@ -174,12 +214,13 @@ function Build-PSLogs
 
     Build-Module @buildParameters | Out-Host
 
-    $modulePath = Join-Path (Join-Path $BuiltModuleDirectory $ModuleVersion) 'PSLogs.psd1'
+    $modulePath = Join-Path (Join-Path $BuiltModuleDirectory $ModuleVersion) "$ModuleName.psd1"
     if (-not (Test-Path -LiteralPath $modulePath))
     {
         throw "ModuleBuilder did not create the expected module manifest: $modulePath"
     }
 
+    Write-Host 'Adding release notes from the changelog.'
     $changelog = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'))
     $releaseTags = & git -C $PSScriptRoot tag --points-at HEAD
     if ($LASTEXITCODE -ne 0)
@@ -199,15 +240,16 @@ function Build-PSLogs
 
     if (-not $releaseNotesMatch.Success)
     {
-        throw "Could not find release notes for PSLogs $ModuleVersion in CHANGELOG.md."
+        throw "Could not find release notes for $ModuleName $ModuleVersion in CHANGELOG.md."
     }
 
     Update-ModuleManifest -Path $modulePath -ReleaseNotes $releaseNotesMatch.Groups['notes'].Value.Trim() -ErrorAction Stop
 
+    Write-Host "Module built successfully: $(Split-Path -Parent $modulePath)" -ForegroundColor Green
     return (Split-Path -Parent $modulePath)
 }
 
-function Invoke-PSLogsTests
+function Invoke-ModuleTests
 {
     param
     (
@@ -216,6 +258,8 @@ function Invoke-PSLogsTests
         $ModuleVersion
     )
 
+    Write-Host 'Preparing Pester and PSScriptAnalyzer' -ForegroundColor Cyan
+    Import-BuildModule -Name PSScriptAnalyzer
     Import-BuildModule -Name Pester
     $env:PSModulePath = $OutputDirectory + [System.IO.Path]::PathSeparator + $env:PSModulePath
 
@@ -227,7 +271,7 @@ function Invoke-PSLogsTests
     $configuration.Output.Verbosity = 'Detailed'
     $configuration.TestResult.Enabled = $true
     $configuration.TestResult.OutputFormat = 'NUnitXml'
-    $configuration.TestResult.OutputPath = Join-Path $TestResultsDirectory 'PSLogs.Tests.xml'
+    $configuration.TestResult.OutputPath = Join-Path $TestResultsDirectory "$ModuleName.Tests.xml"
     $configuration.CodeCoverage.Enabled = $true
     $configuration.CodeCoverage.Path = @(
         (Join-Path $PSScriptRoot 'source\Private\*.ps1'),
@@ -237,16 +281,18 @@ function Invoke-PSLogsTests
     $configuration.CodeCoverage.OutputPath = Join-Path $TestResultsDirectory 'JaCoCo_coverage.xml'
     $configuration.CodeCoverage.CoveragePercentTarget = 1
 
-    Write-Host "Testing PSLogs $ModuleVersion"
+    Write-Host "Running Pester tests for $ModuleName $ModuleVersion (with code coverage)" -ForegroundColor Cyan
     $result = Invoke-Pester -Configuration $configuration
 
-    if ($result.FailedCount -gt 0)
+    if ($result.Result -ne 'Passed')
     {
-        throw "$($result.FailedCount) Pester test(s) failed."
+        throw "Pester did not pass (result: $($result.Result); failed tests: $($result.FailedCount); failed containers: $($result.FailedContainersCount)). See the Pester output above for details."
     }
+
+    Write-Host "Pester tests passed. Test results and coverage reports: $TestResultsDirectory" -ForegroundColor Green
 }
 
-function New-PSLogsPackage
+function New-ModulePackage
 {
     param
     (
@@ -256,11 +302,11 @@ function New-PSLogsPackage
     )
 
     $modulePath = Join-Path $BuiltModuleDirectory $ModuleVersion
-    $packagePath = Join-Path $OutputDirectory "PSLogs.$ModuleVersion.zip"
+    $packagePath = Join-Path $OutputDirectory "$ModuleName.$ModuleVersion.zip"
 
-    if (-not (Test-Path -LiteralPath (Join-Path $modulePath 'PSLogs.psd1')))
+    if (-not (Test-Path -LiteralPath (Join-Path $modulePath "$ModuleName.psd1")))
     {
-        $modulePath = Build-PSLogs -ModuleVersion $ModuleVersion
+        $modulePath = Build-ProjectModule -ModuleVersion $ModuleVersion
     }
 
     if (Test-Path -LiteralPath $packagePath)
@@ -268,14 +314,16 @@ function New-PSLogsPackage
         Remove-Item -LiteralPath $packagePath -Force
     }
 
+    Write-Host "Creating ZIP package for $ModuleName $ModuleVersion" -ForegroundColor Cyan
     Compress-Archive -Path (Join-Path $modulePath '*') -DestinationPath $packagePath -CompressionLevel Optimal
-    Write-Host "Created package: $packagePath"
+    Write-Host "Package created successfully: $packagePath" -ForegroundColor Green
 }
 
 switch ($Task)
 {
     'Clean'
     {
+        Write-Host 'Cleaning generated modules, test results, and ZIP packages. Restored dependencies will be kept.' -ForegroundColor Cyan
         foreach ($path in @($BuiltModuleDirectory, $TestResultsDirectory))
         {
             if (Test-Path -LiteralPath $path)
@@ -284,7 +332,7 @@ switch ($Task)
             }
         }
 
-        Get-ChildItem -Path $OutputDirectory -Filter 'PSLogs.*.zip' -File -ErrorAction SilentlyContinue |
+        Get-ChildItem -Path $OutputDirectory -Filter "$ModuleName.*.zip" -File -ErrorAction SilentlyContinue |
             Remove-Item -Force
         break
     }
@@ -299,21 +347,23 @@ switch ($Task)
     {
         Initialize-BuildDependencies
         $resolvedVersion = Get-ModuleVersion
-        $builtModulePath = Build-PSLogs -ModuleVersion $resolvedVersion
+        $builtModulePath = Build-ProjectModule -ModuleVersion $resolvedVersion
 
         if ($Task -in @('Test', 'Verify'))
         {
-            Invoke-PSLogsTests -ModuleVersion $resolvedVersion
+            Invoke-ModuleTests -ModuleVersion $resolvedVersion
         }
 
         if ($Task -eq 'Package')
         {
-            New-PSLogsPackage -ModuleVersion $resolvedVersion
+            New-ModulePackage -ModuleVersion $resolvedVersion
         }
 
         if ($Task -eq 'Verify')
         {
-            Write-Host "Build and tests passed for PSLogs $resolvedVersion ($builtModulePath)"
+            Write-Host "Build and tests passed for $ModuleName $resolvedVersion ($builtModulePath)"
         }
     }
 }
+
+Write-Host "Build task [$($Task.ToLowerInvariant())] completed successfully." -ForegroundColor Green

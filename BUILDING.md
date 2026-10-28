@@ -22,7 +22,17 @@ The default `Verify` task builds the module from `source/` into `output/PSLogs/<
 
 `Package` creates `output/PSLogs.<version>.zip`. `Clean` removes generated module output, test results, and package archives without deleting the restored dependencies. Generated files under `output/` are ignored by Git.
 
+The build prints progress messages for dependency checks, module compilation, tests, packaging, and cleanup, including the relevant output paths. A successful task ends with a completion message; failed tasks report an error instead.
+
+The build infrastructure discovers the module name and version from the single module manifest directly under `source/`, using `scripts/Get-BuildProject.ps1`. Output directories, package names, test report names, release publishing, and generated documentation use that identity rather than a hard-coded project name. The reusable build steps are `Build-ProjectModule`, `Invoke-ModuleTests`, and `New-ModulePackage`; their order is defined in the `switch ($Task)` block at the bottom of `build.ps1`.
+
+When reusing the infrastructure in another repository, keep the same source layout and update repository configuration such as the manifest path in `release-please-config.json`, the documentation destination in the release workflow, and GitHub secrets. The module's own source and functional tests remain project-specific.
+
 Use the module locally by importing the manifest under `output/PSLogs/<version>/`. Do not edit generated files there; make changes under `source/` and rebuild.
+
+Each build invocation runs in a fresh, profile-free PowerShell process using the same PowerShell installation as the caller. This prevents modules and assemblies already loaded by VS Code or your interactive session from conflicting with the pinned build dependencies. You can continue using `./build.ps1 Test` in your existing session; restarting PowerShell or manually unloading modules is not required.
+
+The test runner explicitly imports the pinned PSScriptAnalyzer and Pester modules from `output/RequiredModules` before test discovery. A dependency import error or discovery error fails the build, just like a failed test. A nonzero exit code from the isolated process is reported as an error to the caller.
 
 ## Making changes without a release
 

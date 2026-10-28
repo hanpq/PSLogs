@@ -190,12 +190,9 @@ Describe 'Quality for files' -Tag 'TestQuality' {
                 (($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') -and $Result -eq 'Windows') -or (($IsLinux -or $IsMacOS) -and $Result -eq 'Unix') | Should -BeTrue
             } -TestCases $file
             It -Name 'File is encoded in UTF8' -Test {
-                # Workaround,  apperently the module encoding and subsequently the command Test-Encoding uses aliases for Sort-Object, these aliases are not available on linux and mac by default and the test fails on Linux and Mac. To mitigate this until the Encoding Module is patched, aliases for this are added.
-                if ($IsMacOS -or $IsLinux)
-                {
-                    New-Alias -Name 'Sort' -Value 'Sort-Object' -Scope Global -ErrorAction SilentlyContinue
-                }
-                Test-Encoding -Path $File.FullName -Encoding utf8 | Should -Be $true
+                $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+                $bytes = [System.IO.File]::ReadAllBytes($File.FullName)
+                { $utf8.GetCharCount($bytes) } | Should -Not -Throw
             } -TestCases $file
             It 'Help.Description Length > 10' {
                 $FunctionHelp.Description.Length | Should -BeGreaterThan 10
