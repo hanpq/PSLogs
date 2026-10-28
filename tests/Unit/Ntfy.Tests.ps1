@@ -204,6 +204,13 @@ Describe -Tags Targets, TargetNtfy 'Ntfy module integration' {
 
             $PendingRequest.AsyncWaitHandle.WaitOne(10000) | Should -BeTrue
             $Context = $Listener.EndGetContext($PendingRequest)
+            # .NET Framework clears some request properties when the response closes.
+            $RequestMetadata = @{
+                Method = $Context.Request.HttpMethod
+                RawUrl = $Context.Request.RawUrl
+                ContentType = $Context.Request.ContentType
+                Authorization = $Context.Request.Headers['Authorization']
+            }
             $Reader = [System.IO.StreamReader]::new($Context.Request.InputStream, [System.Text.Encoding]::UTF8)
             try
             {
@@ -216,10 +223,10 @@ Describe -Tags Targets, TargetNtfy 'Ntfy module integration' {
                 $Context.Response.Close()
             }
 
-            $Context.Request.HttpMethod | Should -Be 'POST'
-            $Context.Request.RawUrl | Should -Be '/'
-            $Context.Request.ContentType | Should -Be 'application/json; charset=utf-8'
-            $Context.Request.Headers['Authorization'] | Should -Be 'Bearer local-test-token'
+            $RequestMetadata.Method | Should -Be 'POST'
+            $RequestMetadata.RawUrl | Should -Be '/'
+            $RequestMetadata.ContentType | Should -Be 'application/json; charset=utf-8'
+            $RequestMetadata.Authorization | Should -Be 'Bearer local-test-token'
             $Payload.topic | Should -Be 'local-test'
             $Payload.message | Should -Be $Message
             $Payload.tags | Should -Be @('warning')
