@@ -118,6 +118,10 @@ BeforeAll {
 }
 
 Describe 'Changelog Management' -Tag 'TestQuality' {
+    BeforeAll {
+        $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    }
+
     It 'Changelog has been updated' -skip:(
         !([bool](Get-Command git -EA SilentlyContinue) -and
             [bool](&(Get-Process -id $PID).Path -NoProfile -Command 'git rev-parse --is-inside-work-tree 2>$null'))
@@ -133,19 +137,26 @@ Describe 'Changelog Management' -Tag 'TestQuality' {
     }
 
     It 'Changelog format compliant with keepachangelog format' -skip:(![bool](Get-Command git -EA SilentlyContinue)) {
-        { Get-ChangelogData (Join-Path $ProjectPath 'CHANGELOG.md') -ErrorAction Stop } | Should -Not -Throw
+        $changelog = Get-Content (Join-Path $projectRoot 'CHANGELOG.md') -Raw
+        $changelog | Should -Match '(?m)^## \[Unreleased\]\s*$'
+        $changelog | Should -Match '(?m)^## \[\d+\.\d+\.\d+[^]]*\] - \d{4}-\d{2}-\d{2}\s*$'
     }
 }
 
 Describe 'General module control' -Tag 'TestQuality' {
+    BeforeAll {
+        $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $moduleName = (Get-ChildItem -Path (Join-Path $projectRoot 'source') -Filter '*.psd1' | Select-Object -First 1).BaseName
+    }
+
     It 'imports without errors' {
-        { Import-Module -Name $ProjectName -Force -ErrorAction Stop } | Should -Not -Throw
-        Get-Module $ProjectName | Should -Not -BeNullOrEmpty
+        { Import-Module -Name $moduleName -Force -ErrorAction Stop } | Should -Not -Throw
+        Get-Module $moduleName | Should -Not -BeNullOrEmpty
     }
 
     It 'Removes without error' {
-        { Remove-Module -Name $ProjectName -ErrorAction Stop } | Should -not -Throw
-        Get-Module $ProjectName | Should -beNullOrEmpty
+        { Remove-Module -Name $moduleName -ErrorAction Stop } | Should -not -Throw
+        Get-Module $moduleName | Should -beNullOrEmpty
     }
 }
 
@@ -179,12 +190,9 @@ Describe 'Quality for files' -Tag 'TestQuality' {
                 (($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') -and $Result -eq 'Windows') -or (($IsLinux -or $IsMacOS) -and $Result -eq 'Unix') | Should -BeTrue
             } -TestCases $file
             It -Name 'File is encoded in UTF8' -Test {
-                # Workaround,  apperently the module encoding and subsequently the command Test-Encoding uses aliases for Sort-Object, these aliases are not available on linux and mac by default and the test fails on Linux and Mac. To mitigate this until the Encoding Module is patched, aliases for this are added.
-                if ($IsMacOS -or $IsLinux)
-                {
-                    New-Alias -Name 'Sort' -Value 'Sort-Object' -Scope Global -ErrorAction SilentlyContinue
-                }
-                Test-Encoding -Path $File.FullName -Encoding utf8 | Should -Be $true
+                $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+                $bytes = [System.IO.File]::ReadAllBytes($File.FullName)
+                { $utf8.GetCharCount($bytes) } | Should -Not -Throw
             } -TestCases $file
             It 'Help.Description Length > 10' {
                 $FunctionHelp.Description.Length | Should -BeGreaterThan 10

@@ -1,0 +1,290 @@
+BeforeAll {
+    $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    $buildScript = Join-Path $projectRoot 'build.ps1'
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($buildScript, [ref]$null, [ref]$null)
+    foreach ($functionName in @('Import-BuildModule', 'Build-ProjectModule', 'Invoke-ModuleTests', 'New-ModulePackage'))
+    {
+        $definition = $ast.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -eq $functionName
+        }, $true)
+        Set-Item -Path "Function:\$functionName" -Value $definition.Body.GetScriptBlock()
+    }
+
+    $DependencyManifest = Join-Path $projectRoot 'RequiredModules.psd1'
+    $RequiredModulesDirectory = Join-Path $projectRoot 'output\RequiredModules'
+    $OutputDirectory = Join-Path $TestDrive 'output'
+    $TestResultsDirectory = Join-Path $OutputDirectory 'testResults'
+    $ModuleName = 'ExampleModule'
+}
+
+Describe 'Module metadata discovery' {
+    BeforeAll {
+        $metadataScript = Join-Path $projectRoot 'scripts\Get-BuildProject.ps1'
+    }
+
+    BeforeEach {
+        $fixtureRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        $fixtureSource = Join-Path $fixtureRoot 'source'
+        New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3' }"
+    }
+
+    It 'uses the source manifest name rather than the repository name' {
+        $project = & $metadataScript -ProjectRoot $fixtureRoot
+
+        $project.Name | Should -Be 'ExampleModule'
+        $project.Version | Should -Be '1.2.3'
+        $project.SourceManifest | Should -Be (Join-Path $fixtureSource 'ExampleModule.psd1')
+    }
+
+    It 'rejects an ambiguous source directory' {
+        Set-Content -LiteralPath (Join-Path $fixtureSource 'OtherModule.psd1') -Value "@{ ModuleVersion = '1.0.0' }"
+
+        { & $metadataScript -ProjectRoot $fixtureRoot } |
+            Should -Throw '*exactly one module manifest*'
+    }
+
+    It 'splits a tracked prerelease into PowerShell manifest fields' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
+
+        $project = & $metadataScript -ProjectRoot $fixtureRoot
+
+        $project.Version | Should -Be '1.3.0-beta001'
+        $project.ModuleVersion | Should -Be '1.3.0'
+        $project.Prerelease | Should -Be 'beta001'
+    }
+
+    It 'allows a local version override without changing the tracked version' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.2.3"}'
+
+        $project = & $metadataScript -ProjectRoot $fixtureRoot -Version '1.3.0-beta002'
+
+        $project.Version | Should -Be '1.3.0-beta002'
+        (& $metadataScript -ProjectRoot $fixtureRoot).Version | Should -Be '1.2.3'
+    }
+
+    It 'keeps stable releases free of a prerelease suffix' {
+        $project = & $metadataScript -ProjectRoot $fixtureRoot -Version '1.3.0'
+
+        $project.ModuleVersion | Should -Be '1.3.0'
+        $project.Prerelease | Should -BeNullOrEmpty
+    }
+
+    It 'reads prerelease metadata from an untracked source template' {
+        Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3'; PrivateData = @{ PSData = @{ Prerelease = 'beta001' } } }"
+
+        $project = & $metadataScript -ProjectRoot $fixtureRoot
+
+        $project.Version | Should -Be '1.2.3-beta001'
+        $project.ModuleVersion | Should -Be '1.2.3'
+    }
+
+    It 'rejects unsupported version <ReleaseVersion>' -ForEach @(
+        @{ ReleaseVersion = '1.3.0-beta.1' }
+        @{ ReleaseVersion = '1.3.0+build123' }
+        @{ ReleaseVersion = '1.3' }
+        @{ ReleaseVersion = '01.3.0' }
+        @{ ReleaseVersion = 'invalid' }
+    ) {
+        { & $metadataScript -ProjectRoot $fixtureRoot -Version $ReleaseVersion } |
+            Should -Throw '*Invalid release version*'
+    }
+
+    It 'rejects a tracking manifest without the root package version' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{}'
+
+        { & $metadataScript -ProjectRoot $fixtureRoot } | Should -Throw '*Invalid release version*'
+    }
+}
+
+Describe 'Module packaging' {
+    It 'rebuilds rather than packaging a different release from the same numeric directory' {
+        $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
+        $moduleDirectory = Join-Path $BuiltModuleDirectory '1.2.3'
+        New-Item -ItemType Directory -Path $moduleDirectory -Force | Out-Null
+        $manifestPath = Join-Path $moduleDirectory "$ModuleName.psd1"
+        Set-Content -LiteralPath $manifestPath -Value "@{ ModuleVersion = '1.2.3' }"
+        Mock Build-ProjectModule {
+            Set-Content -LiteralPath $manifestPath -Value "@{ ModuleVersion = '1.2.3'; PrivateData = @{ PSData = @{ Prerelease = 'beta001' } } }"
+            $moduleDirectory
+        }
+
+        New-ModulePackage -ModuleVersion '1.2.3-beta001'
+
+        Should -Invoke Build-ProjectModule -Times 1 -Exactly -ParameterFilter { $ModuleVersion -eq '1.2.3-beta001' }
+    }
+
+    It 'creates a package for a differently named module at <ReleaseVersion>' -ForEach @(
+        @{ ReleaseVersion = '1.2.3'; Label = '' }
+        @{ ReleaseVersion = '1.2.3-beta001'; Label = 'beta001' }
+        @{ ReleaseVersion = '1.2.3-beta002'; Label = 'beta002' }
+    ) {
+        $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
+        $moduleDirectory = Join-Path $BuiltModuleDirectory '1.2.3'
+        New-Item -ItemType Directory -Path $moduleDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $moduleDirectory "$ModuleName.psd1") -Value "@{ ModuleVersion = '1.2.3'; PrivateData = @{ PSData = @{ Prerelease = '$Label' } } }"
+
+        New-ModulePackage -ModuleVersion $ReleaseVersion
+
+        $package = Join-Path $OutputDirectory "ExampleModule.$ReleaseVersion.zip"
+        Test-Path -LiteralPath $package | Should -BeTrue
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($package)
+        try
+        {
+            $archive.Entries.FullName | Should -Contain 'ExampleModule.psd1'
+        }
+        finally
+        {
+            $archive.Dispose()
+        }
+    }
+}
+
+Describe 'Release publication guards' {
+    BeforeAll {
+        $assertScript = Join-Path $projectRoot 'scripts\Assert-ReleaseMetadata.ps1'
+    }
+
+    BeforeEach {
+        $fixtureRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        $fixtureSource = Join-Path $fixtureRoot 'source'
+        New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3' }"
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
+        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{"prerelease":true}}}'
+    }
+
+    It 'accepts a matching prerelease' {
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true
+
+        $project.Version | Should -Be '1.3.0-beta001'
+    }
+
+    It 'accepts promotion to the same numeric stable version' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
+        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{"prerelease":false}}}'
+
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false
+
+        $project.Version | Should -Be '1.3.0'
+    }
+
+    It 'rejects a tag that disagrees with the package version' {
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta002' -IsPrerelease $true } |
+            Should -Throw '*tag*does not match*'
+    }
+
+    It 'rejects a prerelease incorrectly marked stable on GitHub' {
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $false } |
+            Should -Throw '*GitHub prerelease flag*'
+    }
+
+    It 'rejects a stable package incorrectly marked as a GitHub prerelease' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $true } |
+            Should -Throw '*GitHub prerelease flag*'
+    }
+
+    It 'rejects a stable release while prerelease mode is enabled' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false } |
+            Should -Throw '*Release Please prerelease mode*'
+    }
+
+    It 'rejects a missing release mode rather than assuming stable' {
+        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{}}}'
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true } |
+            Should -Throw '*explicitly configure a boolean prerelease mode*'
+    }
+}
+
+Describe 'Pinned build module imports' {
+    It 'imports the pinned analyzer manifest beyond the helper scope' {
+        Mock Import-Module {}
+
+        Import-BuildModule -Name PSScriptAnalyzer
+
+        Should -Invoke Import-Module -Times 1 -Exactly -ParameterFilter {
+            $Name -eq (Join-Path $RequiredModulesDirectory 'PSScriptAnalyzer\1.24.0\PSScriptAnalyzer.psd1') -and
+            $Global -and $ErrorAction -eq 'Stop'
+        }
+    }
+}
+
+Describe 'Build test runner' {
+    BeforeEach {
+        $originalModulePath = $env:PSModulePath
+        Mock Write-Host {}
+        Mock Import-BuildModule {}
+        Mock Invoke-Pester {
+            [pscustomobject]@{
+                Result                = 'Passed'
+                FailedCount           = 0
+                FailedContainersCount = 0
+            }
+        }
+    }
+
+    AfterEach {
+        $env:PSModulePath = $originalModulePath
+    }
+
+    It 'loads the analyzer and Pester explicitly before running tests' {
+        Invoke-ModuleTests -ModuleVersion '1.2.3'
+
+        Should -Invoke Import-BuildModule -Times 1 -Exactly -ParameterFilter { $Name -eq 'PSScriptAnalyzer' }
+        Should -Invoke Import-BuildModule -Times 1 -Exactly -ParameterFilter { $Name -eq 'Pester' }
+        Should -Invoke Invoke-Pester -Times 1 -Exactly -ParameterFilter {
+            $Configuration.TestResult.OutputPath.Value -eq (Join-Path $TestResultsDirectory 'ExampleModule.Tests.xml')
+        }
+        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter {
+            $Object -like 'Pester tests passed.*'
+        }
+    }
+
+    It 'does not start Pester when the analyzer cannot be imported' {
+        Mock Import-BuildModule {
+            throw 'Analyzer assembly conflict'
+        } -ParameterFilter { $Name -eq 'PSScriptAnalyzer' }
+
+        { Invoke-ModuleTests -ModuleVersion '1.2.3' } |
+            Should -Throw '*Analyzer assembly conflict*'
+
+        Should -Invoke Invoke-Pester -Times 0 -Exactly
+    }
+
+    It 'fails when discovery fails without any failed tests' {
+        Mock Invoke-Pester {
+            [pscustomobject]@{
+                Result                = 'Failed'
+                FailedCount           = 0
+                FailedContainersCount = 1
+            }
+        }
+
+        { Invoke-ModuleTests -ModuleVersion '1.2.3' } |
+            Should -Throw '*failed tests: 0; failed containers: 1*'
+
+        Should -Invoke Write-Host -Times 0 -Exactly -ParameterFilter {
+            $Object -like 'Pester tests passed.*'
+        }
+    }
+
+    It 'fails when a test fails' {
+        Mock Invoke-Pester {
+            [pscustomobject]@{
+                Result                = 'Failed'
+                FailedCount           = 1
+                FailedContainersCount = 0
+            }
+        }
+
+        { Invoke-ModuleTests -ModuleVersion '1.2.3' } |
+            Should -Throw '*failed tests: 1; failed containers: 0*'
+    }
+}

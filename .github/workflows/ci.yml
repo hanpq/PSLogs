@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux PowerShell
+            os: ubuntu-latest
+            shell: pwsh
+            coverage_flag: linux
+          - name: macOS PowerShell
+            os: macos-latest
+            shell: pwsh
+            coverage_flag: macos
+          - name: Windows PowerShell
+            os: windows-latest
+            shell: pwsh
+            coverage_flag: windows-core
+          - name: Windows PowerShell Desktop
+            os: windows-2022
+            shell: powershell
+            coverage_flag: windows-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build and test
+        shell: ${{ matrix.shell }}
+        run: ./build.ps1 -Task Test
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: output/testResults/JaCoCo_coverage.xml
+          flags: ${{ matrix.coverage_flag }}
+          token: ${{ secrets.CODECOV_TOKEN }}

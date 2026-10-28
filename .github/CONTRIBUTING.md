@@ -1,7 +1,9 @@
 # Contributing
 
-Please check out common DSC Community [contributing guidelines](https://dsccommunity.org/guidelines/contributing).
+Use the local build script to validate changes:
 
-## Running the Tests
+```powershell
+./build.ps1
+```
 
-If want to know how to run this module's tests you can look at the [Testing Guidelines](https://dsccommunity.org/guidelines/testing-guidelines/#running-tests)
+See [BUILDING.md](../BUILDING.md) for build and test commands, dependency version pins, and release conventions.

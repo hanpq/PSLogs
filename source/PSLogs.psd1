@@ -8,7 +8,7 @@
 
 @{
     RootModule           = 'PSLogs.psm1'
-    ModuleVersion        = '0.0.1'
+    ModuleVersion        = '5.6.1'
     CompatiblePSEditions = @('Desktop', 'Core')
     PowerShellVersion    = '5.1'
     GUID                 = '13599ad2-2234-44f2-933f-ffbb2e8e64c6'
