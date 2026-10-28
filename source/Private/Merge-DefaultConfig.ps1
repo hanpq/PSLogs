@@ -66,6 +66,18 @@ function Merge-DefaultConfig
             {
                 $result[$Param] = $Configuration[$Param]
             }
+            elseif ($DefaultConfiguration[$Param].Type -eq [string[]] -and
+                ($Configuration[$Param] -is [string] -or $Configuration[$Param] -is [array]))
+            {
+                foreach ($item in $Configuration[$Param])
+                {
+                    if ($item -isnot [string])
+                    {
+                        throw ('Configuration {0} must contain only strings for target {1}' -f $Param, $Target)
+                    }
+                }
+                $result[$Param] = [string[]]$Configuration[$Param]
+            }
             else
             {
                 throw ('Configuration {0} has to be of type {1} for target {2}' -f $Param, $DefaultConfiguration[$Param].Type, $Target)

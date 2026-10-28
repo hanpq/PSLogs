@@ -164,15 +164,50 @@ Describe -Tags Targets, TargetNtfy 'Ntfy module integration' {
         Add-LoggingTarget -Type Ntfy -Configuration @{
             Url = 'http://127.0.0.1:1/'
             Topic = 'pslogs-test'
-            NotificationTags = [string[]] @('warning')
+            NotificationTags = @('warning')
             Tags = @('Operations')
         }
         $Enabled = (Get-LoggingTarget).Ntfy
         $Enabled.Url | Should -Be 'http://127.0.0.1:1/'
         $Enabled.Priority | Should -Be 3
         $Enabled.NotificationTags | Should -Be @('warning')
+        ($Enabled.NotificationTags -is [string[]]) | Should -BeTrue
         $Enabled.Tags | Should -Be @('operations')
         $Enabled.Type | Should -Be 'Ntfy'
+    }
+
+    It 'accepts <Label> notification tags through the public configuration API' -ForEach @(
+        @{ Label = 'a single string'; Value = 'warning'; Expected = @('warning') }
+        @{ Label = 'an ordinary array'; Value = @('warning', 'computer'); Expected = @('warning', 'computer') }
+        @{ Label = 'an empty array'; Value = @(); Expected = @() }
+        @{ Label = 'a typed array'; Value = [string[]]@('warning'); Expected = @('warning') }
+    ) {
+        Add-LoggingTarget -Type Ntfy -Configuration @{
+            Url = 'http://127.0.0.1:1/'
+            Topic = 'pslogs-test'
+            NotificationTags = $Value
+        }
+
+        $Enabled = (Get-LoggingTarget).Ntfy
+        ($Enabled.NotificationTags -is [string[]]) | Should -BeTrue
+        $Enabled.NotificationTags.Count | Should -Be $Expected.Count
+        ($Enabled.NotificationTags -join ',') | Should -Be ($Expected -join ',')
+    }
+
+    It 'rejects <Label> notification tags without enabling the target' -ForEach @(
+        @{ Label = 'a number'; Value = 42 }
+        @{ Label = 'mixed types'; Value = @('warning', 42) }
+        @{ Label = 'null'; Value = $null }
+        @{ Label = 'a null element'; Value = @('warning', $null) }
+        @{ Label = 'a nested array'; Value = @('warning', @('computer')) }
+    ) {
+        { Add-LoggingTarget -Type Ntfy -Configuration @{
+            Url = 'http://127.0.0.1:1/'
+            Topic = 'pslogs-test'
+            NotificationTags = $Value
+        } } | Should -Throw '*Configuration NotificationTags*'
+
+        (Get-LoggingTarget).ContainsKey('Ntfy') | Should -BeFalse
     }
 
     It 'publishes a UTF-8 notification from the consumer runspace to a local HTTP server' {

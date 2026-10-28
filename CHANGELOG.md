@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Accept ordinary PowerShell string arrays and single strings for Ntfy notification tags without requiring an explicit `[string[]]` cast.
+
 ### Added
 
 - Added the Ntfy logging target with hosted/self-hosted publishing, Unicode message formatting, titles, priorities, notification tags, and bearer-token authentication.
