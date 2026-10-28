@@ -17,20 +17,18 @@ AfterAll {
     Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 }
 
-InModuleScope PSLogs {
 
-    Describe -Tags Targets, TargetConsole 'Console target' {
-        # Give time to the runspace to init the targets
-        Start-Sleep -Milliseconds 100
+Describe -Tags Targets, TargetConsole 'Console target' {
+    # Give time to the runspace to init the targets
+    Start-Sleep -Milliseconds 100
 
-        It 'should be available in the module' {
-            $Targets = Get-LoggingAvailableTarget
-            $Targets.Console | Should -Not -BeNullOrEmpty
-        }
+    It 'should be available in the module' {
+        $Targets = Get-LoggingAvailableTarget
+        $Targets.Console | Should -Not -BeNullOrEmpty
+    }
 
-        It "shouldn't have required parameters" {
-            $Targets = Get-LoggingAvailableTarget
-            $Targets.Console.ParamsRequired | Should -BeNullOrEmpty
-        }
+    It "shouldn't have required parameters" {
+        $Targets = Get-LoggingAvailableTarget
+        $Targets.Console.ParamsRequired | Should -BeNullOrEmpty
     }
 }

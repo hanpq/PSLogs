@@ -17,85 +17,137 @@ AfterAll {
     Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
 }
 
-InModuleScope PSLogs {
-    Describe -Tags Build 'Internal Vars' {
-        It 'sets up internal variables' {
-            InModuleScope PSLogs {
-                Test-Path Variable:Logging | Should -Be $true
-                Test-Path Variable:Defaults | Should -Be $true
-                Test-Path Variable:LevelNames | Should -Be $true
-                Test-Path Variable:LoggingRunspace | Should -Be $true
-                Test-Path Variable:LoggingEventQueue | Should -Be $true
-            }
+Describe -Tags Build 'Internal Vars' {
+    It 'sets up internal variables' {
+        InModuleScope PSLogs {
+            Test-Path Variable:Logging | Should -Be $true
+            Test-Path Variable:Defaults | Should -Be $true
+            Test-Path Variable:LevelNames | Should -Be $true
+            Test-Path Variable:LoggingRunspace | Should -Be $true
+            Test-Path Variable:LoggingEventQueue | Should -Be $true
+        }
+    }
+}
+
+Describe -Tags Build 'Token replacement' {
+    BeforeAll {
+        $TimeStamp = Get-Date -UFormat '%Y-%m-%dT%T%Z'
+        $Object = [PSCustomObject] @{
+            message   = 'Test'
+            timestamp = $TimeStamp
+            level     = 'INFO'
         }
     }
 
-    Describe -Tags Build 'Token replacement' {
-        BeforeAll {
-            $TimeStamp = Get-Date -UFormat '%Y-%m-%dT%T%Z'
-            $Object = [PSCustomObject] @{
-                message   = 'Test'
-                timestamp = $TimeStamp
-                level     = 'INFO'
-            }
-        }
+    It 'should return a string with token replaced' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
 
-        It 'should return a string with token replaced' {
             Format-Pattern -Pattern '%{message}' -Source $Object | Should -Be 'Test'
         }
+    }
 
-        It 'should return a string with token replaced and padded' {
+    It 'should return a string with token replaced and padded' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
+
             Format-Pattern -Pattern '%{message:7}' -Source $Object | Should -Be '   Test'
             Format-Pattern -Pattern '%{message:-7}' -Source $Object | Should -Be 'Test   '
         }
+    }
 
-        It 'should return a string with a timestamp, no formatter' {
+    It 'should return a string with a timestamp, no formatter' {
+        InModuleScope PSLogs -Parameters @{ TimeStamp = $TimeStamp; Object = $Object } {
+            param($TimeStamp, $Object)
+
             Format-Pattern -Pattern '%{timestamp}' -Source $Object | Should -Be $TimeStamp
-        }
-
-        It 'should return a string using a custom Unix format with token' {
-            Format-Pattern -Pattern '%{timestamp:+%Y%m%d}' -Source $Object | Should -Be $(Get-Date $TimeStamp -UFormat '%Y%m%d')
-        }
-
-        It 'should return a string using a custom Unix format without token' {
-            Format-Pattern -Pattern '%{+%Y%m%d}' -Source $Object | Should -Be $(Get-Date -UFormat '%Y%m%d')
-        }
-
-        It 'should return a string using a custom Unix format with a full day name, with token' {
-            Format-Pattern -Pattern '%{timestamp:+%A, %B %d, %Y}' -Source $Object | Should -Be $(Get-Date $TimeStamp -UFormat '%A, %B %d, %Y')
-        }
-
-        It 'should return a string using a custom Unix format with a full day name, without token' {
-            Format-Pattern -Pattern '%{+%A, %B %d, %Y}' -Source $Object | Should -Be $(Get-Date -UFormat '%A, %B %d, %Y')
-        }
-
-        It 'should return a string using a custom Unix format with token, with padding' {
-            Format-Pattern -Pattern '%{timestamp:+%Y%m:12}' -Source $Object | Should -Be $('      {0}' -f (Get-Date $TimeStamp -UFormat '%Y%m'))
-        }
-
-        It 'should return a string using a custom Unix format without token, with padding' {
-            Format-Pattern -Pattern '%{+%Y%m:12}' -Source $Object | Should -Be $('      {0}' -f (Get-Date -UFormat '%Y%m'))
-        }
-
-        It 'should return a string using a custom [DateTimeFormatInfo] string with token' {
-            Format-Pattern -Pattern '%{timestamp:+yyyy/MM/dd HH:mm:ss.fff}' -Source $Object | Should -Be $(Get-Date $TimeStamp -Format 'yyyy/MM/dd HH:mm:ss.fff')
-        }
-
-        It 'should return a string using a custom [DateTimeFormatInfo] string without token' {
-            Format-Pattern -Pattern '%{+yyyy/MM/dd HH}' -Source $Object | Should -Be $(Get-Date -Format 'yyyy/MM/dd HH')
-        }
-
-        It 'should return a string using a custom [DateTimeFormatInfo] string with token, with padding' {
-            Format-Pattern -Pattern '%{timestamp:+HH:mm:ss.fff:15}' -Source $Object | Should -Be $('   {0}' -f (Get-Date $TimeStamp -Format 'HH:mm:ss.fff'))
-        }
-
-        It 'should return a string using a custom [DateTimeFormatInfo] string without token, with padding' {
-            Format-Pattern -Pattern '%{+yyyy/MM/dd HH:15}' -Source $Object | Should -Be $('  {0}' -f (Get-Date -Format 'yyyy/MM/dd HH'))
         }
     }
 
-    Describe -Tags Build 'Logging Levels' {
-        It 'should return logging levels names' {
+    It 'should return a string using a custom Unix format with token' {
+        InModuleScope PSLogs -Parameters @{ TimeStamp = $TimeStamp; Object = $Object } {
+            param($TimeStamp, $Object)
+
+            Format-Pattern -Pattern '%{timestamp:+%Y%m%d}' -Source $Object | Should -Be $(Get-Date $TimeStamp -UFormat '%Y%m%d')
+        }
+    }
+
+    It 'should return a string using a custom Unix format without token' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
+
+            Format-Pattern -Pattern '%{+%Y%m%d}' -Source $Object | Should -Be $(Get-Date -UFormat '%Y%m%d')
+        }
+    }
+
+    It 'should return a string using a custom Unix format with a full day name, with token' {
+        InModuleScope PSLogs -Parameters @{ TimeStamp = $TimeStamp; Object = $Object } {
+            param($TimeStamp, $Object)
+
+            Format-Pattern -Pattern '%{timestamp:+%A, %B %d, %Y}' -Source $Object | Should -Be $(Get-Date $TimeStamp -UFormat '%A, %B %d, %Y')
+        }
+    }
+
+    It 'should return a string using a custom Unix format with a full day name, without token' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
+
+            Format-Pattern -Pattern '%{+%A, %B %d, %Y}' -Source $Object | Should -Be $(Get-Date -UFormat '%A, %B %d, %Y')
+        }
+    }
+
+    It 'should return a string using a custom Unix format with token, with padding' {
+        InModuleScope PSLogs -Parameters @{ TimeStamp = $TimeStamp; Object = $Object } {
+            param($TimeStamp, $Object)
+
+            Format-Pattern -Pattern '%{timestamp:+%Y%m:12}' -Source $Object | Should -Be $('      {0}' -f (Get-Date $TimeStamp -UFormat '%Y%m'))
+        }
+    }
+
+    It 'should return a string using a custom Unix format without token, with padding' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
+
+            Format-Pattern -Pattern '%{+%Y%m:12}' -Source $Object | Should -Be $('      {0}' -f (Get-Date -UFormat '%Y%m'))
+        }
+    }
+
+    It 'should return a string using a custom [DateTimeFormatInfo] string with token' {
+        InModuleScope PSLogs -Parameters @{ TimeStamp = $TimeStamp; Object = $Object } {
+            param($TimeStamp, $Object)
+
+            Format-Pattern -Pattern '%{timestamp:+yyyy/MM/dd HH:mm:ss.fff}' -Source $Object | Should -Be $(Get-Date $TimeStamp -Format 'yyyy/MM/dd HH:mm:ss.fff')
+        }
+    }
+
+    It 'should return a string using a custom [DateTimeFormatInfo] string without token' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
+
+            Format-Pattern -Pattern '%{+yyyy/MM/dd HH}' -Source $Object | Should -Be $(Get-Date -Format 'yyyy/MM/dd HH')
+        }
+    }
+
+    It 'should return a string using a custom [DateTimeFormatInfo] string with token, with padding' {
+        InModuleScope PSLogs -Parameters @{ TimeStamp = $TimeStamp; Object = $Object } {
+            param($TimeStamp, $Object)
+
+            Format-Pattern -Pattern '%{timestamp:+HH:mm:ss.fff:15}' -Source $Object | Should -Be $('   {0}' -f (Get-Date $TimeStamp -Format 'HH:mm:ss.fff'))
+        }
+    }
+
+    It 'should return a string using a custom [DateTimeFormatInfo] string without token, with padding' {
+        InModuleScope PSLogs -Parameters @{ Object = $Object } {
+            param($Object)
+
+            Format-Pattern -Pattern '%{+yyyy/MM/dd HH:15}' -Source $Object | Should -Be $('  {0}' -f (Get-Date -Format 'yyyy/MM/dd HH'))
+        }
+    }
+}
+
+Describe -Tags Build 'Logging Levels' {
+    It 'should return logging levels names' {
+        InModuleScope PSLogs {
             $Levels = Get-LevelsName
             $Levels | Should -Contain 'ALERT'
             $Levels | Should -Contain 'CRITICAL'
@@ -109,123 +161,167 @@ InModuleScope PSLogs {
             $Levels | Should -Contain 'VERBOSE'
             $Levels | Should -Contain 'WARNING'
         }
+    }
 
-        It 'should return loggin level name' {
+    It 'should return loggin level name' {
+        InModuleScope PSLogs {
             Get-LevelName -Level 10 | Should -Be 'DEBUG'
             { Get-LevelName -Level 'DEBUG' } | Should -Throw
         }
+    }
 
-        It 'should return logging levels number' {
+    It 'should return logging levels number' {
+        InModuleScope PSLogs {
             Get-LevelNumber -Level 0 | Should -Be 0
             Get-LevelNumber -Level 'NOTSET' | Should -Be 0
         }
+    }
 
-        It 'should throw on invalid level' {
+    It 'should throw on invalid level' {
+        InModuleScope PSLogs {
             { Get-LevelNumber -Level 11 } | Should -Throw
             { Get-LevelNumber -Level 'LEVEL_UNKNOWN' } | Should -Throw
         }
+    }
 
-        It 'should add a new logging level' {
+    It 'should add a new logging level' {
+        InModuleScope PSLogs {
             Add-LoggingLevel -Level 11 -LevelName 'Test'
             Get-LevelsName | Should -Contain 'TEST'
         }
+    }
 
-        It 'should change the level name if same level number' {
+    It 'should change the level name if same level number' {
+        InModuleScope PSLogs {
             Add-LoggingLevel -Level 11 -LevelName 'Foo'
             Get-LevelsName | Should -Contain 'FOO'
         }
+    }
 
-        It 'should change the level number if same level name' {
+    It 'should change the level number if same level name' {
+        InModuleScope PSLogs {
             Add-LoggingLevel -Level 21 -LevelName 'Foo'
             Get-LevelsName | Should -Contain 'FOO'
             Get-LevelNumber -Level 'FOO' | Should -Be 21
         }
+    }
 
-        It 'return the default logging level' {
+    It 'return the default logging level' {
+        InModuleScope PSLogs {
             Get-LoggingDefaultLevel | Should -Be 'NOTSET'
         }
+    }
 
-        It 'sets the default logging level' {
+    It 'sets the default logging level' {
+        InModuleScope PSLogs {
             Set-LoggingDefaultLevel -Level INFO
             Get-LoggingDefaultLevel | Should -Be 'INFO'
         }
+    }
 
-        It 'change the logging level of available targets' {
+    It 'change the logging level of available targets' {
+        InModuleScope PSLogs {
             Add-LoggingTarget -Name Console
             (Get-LoggingTarget -Name Console).Level | Should -Be 'INFO'
         }
-        It 'change the logging level of already configured targets' {
+    }
+    It 'change the logging level of already configured targets' {
+        InModuleScope PSLogs {
             Set-LoggingDefaultLevel -Level DEBUG
             (Get-LoggingTarget -Name Console).Level | Should -Be 'DEBUG'
         }
-
     }
 
-    Describe -Tags Build 'Logging Targets' {
-        BeforeAll {
-            $TargetsPath = '{0}\..\..\source\include' -f $PSScriptRoot
-            $Targets = Get-ChildItem -Path $TargetsPath -Filter '*.ps1'
-        }
+}
 
-        It 'loads the logging targets' {
+Describe -Tags Build 'Logging Targets' {
+    BeforeAll {
+        $TargetsPath = '{0}\..\..\source\include' -f $PSScriptRoot
+        $Targets = Get-ChildItem -Path $TargetsPath -Filter '*.ps1'
+    }
+
+    It 'loads the logging targets' {
+        InModuleScope PSLogs -Parameters @{ Targets = $Targets } {
+            param($Targets)
+
             $Logging.Targets.Count | Should -Be $Targets.Count
         }
+    }
 
-        It 'returns the loaded logging targets' {
+    It 'returns the loaded logging targets' {
+        InModuleScope PSLogs -Parameters @{ Targets = $Targets } {
+            param($Targets)
+
             $AvailableTargets = Get-LoggingAvailableTarget
             # not sure how to test System.Collections.Concurrent.ConcurrentDictionary[string, hashtable]
             # $AvailableTargets | Should Be []
             $AvailableTargets.Count | Should -Be $Targets.Count
         }
+    }
 
-        It 'is case-insensitive' {
+    It 'is case-insensitive' {
+        InModuleScope PSLogs {
             $AvailableTargets = Get-LoggingAvailableTarget
             $AvailableTargets[$AvailableTargets.Keys[0].ToLower()] | Should -Not -BeNullOrEmpty
         }
     }
+}
 
-    Describe -Tags Build 'Logging Format' {
-        It 'gets the default format' {
+Describe -Tags Build 'Logging Format' {
+    It 'gets the default format' {
+        InModuleScope PSLogs {
             Get-LoggingDefaultFormat | Should -Be $Defaults.Format
         }
+    }
 
-        It 'sets the default logging format' {
+    It 'sets the default logging format' {
+        InModuleScope PSLogs {
             $NewFormat = '[%{level:-7}] %{message}'
             Get-LoggingDefaultFormat | Should -Be $Defaults.Format
             Set-LoggingDefaultFormat -Format $NewFormat
             Get-LoggingDefaultFormat | Should -Be $NewFormat
         }
+    }
 
-        It 'change the logging format of already configured targets' {
+    It 'change the logging format of already configured targets' {
+        InModuleScope PSLogs {
             $NewFormat = '[%{level:-7}] %{message}'
             Add-LoggingTarget -Name Console
             Set-LoggingDefaultFormat -Format $NewFormat
             (Get-LoggingTarget -Name Console).Format | Should -Be $NewFormat
         }
+    }
 
-        It 'change the default format of available targets' {
+    It 'change the default format of available targets' {
+        InModuleScope PSLogs {
             $NewFormat = '[%{level:-7}] %{message}'
             Set-LoggingDefaultFormat -Format $NewFormat
             Add-LoggingTarget -Name Console
             (Get-LoggingTarget -Name Console).Format | Should -Be $NewFormat
         }
     }
+}
 
-    Describe -Tags Build 'Logging Caller Scope' {
-        It 'should be the default value' {
+Describe -Tags Build 'Logging Caller Scope' {
+    It 'should be the default value' {
+        InModuleScope PSLogs {
             Get-LoggingCallerScope | Should -Be $Defaults.CallerScope
         }
+    }
 
-        It 'should change the caller scope value' {
+    It 'should change the caller scope value' {
+        InModuleScope PSLogs {
             $newScope = 3
             Get-LoggingCallerScope | Should -Be $Defaults.CallerScope
             Set-LoggingCallerScope -CallerScope $newScope
             Get-LoggingCallerScope | Should -Be $newScope
         }
     }
+}
 
-    Describe -Tags Build 'Dynamic Parameter' {
-        It 'should contain the default levels' {
+Describe -Tags Build 'Dynamic Parameter' {
+    It 'should contain the default levels' {
+        InModuleScope PSLogs {
             $dynamicDictionary = New-LoggingDynamicParam -Name 'PesterTest' -Level
 
             [String[]] $allowedValues = $dynamicDictionary['PesterTest'].Attributes[1].ValidValues
@@ -233,8 +329,10 @@ InModuleScope PSLogs {
             'ERROR' -in $allowedValues | Should -Be $true
             'DEBUG' -in $allowedValues | Should -Be $true
         }
+    }
 
-        It 'should contain the default targets' {
+    It 'should contain the default targets' {
+        InModuleScope PSLogs {
             $dynamicDictionary = New-LoggingDynamicParam -Name 'PesterTest' -Target
 
             [String[]] $allowedValues = $dynamicDictionary['PesterTest'].Attributes[1].ValidValues
@@ -243,13 +341,13 @@ InModuleScope PSLogs {
             'Console' -in $allowedValues | Should -Be $true
         }
     }
+}
 
-    Describe -Tags Build 'Logging Producer-Consumer' {
-        It 'should start logging manager after module import' {
-            InModuleScope PSLogs {
-                Test-Path Variable:LoggingEventQueue | Should -Be $true
-                Test-Path Variable:LoggingRunspace | Should -Be $true
-            }
+Describe -Tags Build 'Logging Producer-Consumer' {
+    It 'should start logging manager after module import' {
+        InModuleScope PSLogs {
+            Test-Path Variable:LoggingEventQueue | Should -Be $true
+            Test-Path Variable:LoggingRunspace | Should -Be $true
         }
     }
 }
@@ -258,8 +356,8 @@ Describe -Tags Unit 'Performance load' {
     $ManifestPath = '{0}\..\..\source\pslogs.psd1' -f $PSScriptRoot
 
     BeforeEach {
-        Remove-Module $ProjectName -Force -ErrorAction SilentlyContinue
-        Import-Module $ProjectName -Force
+        Remove-Module PSLogs -Force -ErrorAction SilentlyContinue
+        Import-Module $ModuleManifestFileInfo.FullName -Force
         Start-Sleep -Seconds 1
     }
 

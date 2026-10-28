@@ -45,6 +45,27 @@ Wait-Logging        # See Note
 
 When used in *unattended* scripts (scheduled tasks, spawned process) you need to call `Wait-Logging` to avoid loosing messages. If you run your main script in an interactive shell that stays open at the end of the execution you could avoid using it (keep in mind that if there are messeages in the queue when you close the shell, you'll lose them)
 
+## OutputDebugString target
+
+The `OutputDebugString` target sends formatted messages to a Windows debugger or
+debug-output listener such as Sysinternals DebugView using the Unicode
+`OutputDebugStringW` API. On Linux and macOS, the target silently does nothing.
+
+```powershell
+Add-LoggingTarget -Type OutputDebugString -Configuration @{
+    Level = 'DEBUG'
+    Format = '[%{level}] %{message}'
+    PrintException = $true
+}
+Write-Log -Level INFO -Message 'Hello, debugger!'
+Wait-Logging
+```
+
+All options are optional. `Level` and `Format` use the module defaults.
+`PrintException` defaults to `$true` and appends the exception message and script
+stack trace when present. Messages are not retained if no debugger or listener is
+listening.
+
 ## Docs
 
 Please the full documentation on the [docs site][pslogsdocs]
