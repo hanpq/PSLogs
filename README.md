@@ -45,20 +45,6 @@ Wait-Logging        # See Note
 
 When used in *unattended* scripts (scheduled tasks, spawned process) you need to call `Wait-Logging` to avoid loosing messages. If you run your main script in an interactive shell that stays open at the end of the execution you could avoid using it (keep in mind that if there are messeages in the queue when you close the shell, you'll lose them)
 
-### Ntfy notification tags
-
-Configure notification icons with a normal PowerShell array; no explicit `[string[]]` cast is needed. A single string and an empty array are also accepted. Non-string elements are rejected.
-
-```powershell
-Add-LoggingTarget -Name Ntfy -Configuration @{
-    Url              = 'https://YOUR-NTFY-SERVER'
-    Topic            = 'YOUR-TEST-TOPIC'
-    NotificationTags = @('warning', 'computer')
-}
-```
-
-These are ntfy notification tags, not the separate `Tags` setting used to route log messages.
-
 ## Docs
 
 Please the full documentation on the [docs site][pslogsdocs]
