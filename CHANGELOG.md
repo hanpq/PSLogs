@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Change
 
+- Replaced the Sampler-based build and release pipeline with a pinned, self-contained PowerShell build and Release Please.
 - Improved internal function documentation
 - Improved build tests
 - Updated module-scope tests for Pester discovery and corrected platform simulation in the OutputDebugString tests.

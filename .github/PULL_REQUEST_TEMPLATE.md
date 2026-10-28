@@ -51,7 +51,7 @@
 
 - [ ] The PR represents a single logical change. i.e. Cosmetic updates should go in different PRs.
 - [ ] Added an entry under the Unreleased section of in the CHANGELOG.md as per [format](https://keepachangelog.com/en/1.0.0/).
-- [ ] Local clean build passes without issue or fail tests (`build.ps1 -ResolveDependency`).
+- [ ] Local build and tests pass (`./build.ps1`).
 - [ ] Documentation added/updated in README.md.
 - [ ] Comment-based help added/updated.
 - [ ] Localization strings added/updated in all localization files as appropriate.
