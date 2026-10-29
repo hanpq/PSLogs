@@ -1,5 +1,16 @@
 BeforeAll {
     $scriptUnderTest = Join-Path $PSScriptRoot '..\..\scripts\New-StablePromotion.ps1'
+
+    function New-TestHttpException
+    {
+        param([string]$Message, [System.Net.HttpStatusCode]$StatusCode)
+
+        $exception = [System.Exception]::new($Message)
+        $exception | Add-Member -NotePropertyName Response -NotePropertyValue ([pscustomobject]@{
+            StatusCode = $StatusCode
+        })
+        return $exception
+    }
 }
 
 Describe 'Stable promotion PR creation' {
@@ -122,8 +133,7 @@ Describe 'Stable promotion PR creation' {
 
     It 'creates version.txt without a sha when it is absent from the beta' {
         Mock Invoke-RestMethod {
-            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
-            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Version file not found', $response)
+            throw (New-TestHttpException -Message 'Version file not found' -StatusCode NotFound)
         } -ParameterFilter { -not $Method -and $Uri -like '*/contents/version.txt?*' }
 
         & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
@@ -137,8 +147,7 @@ Describe 'Stable promotion PR creation' {
 
     It 'does not ignore missing required release files' {
         Mock Invoke-RestMethod {
-            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
-            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Manifest not found', $response)
+            throw (New-TestHttpException -Message 'Manifest not found' -StatusCode NotFound)
         } -ParameterFilter { -not $Method -and $Uri -like '*/contents/.release-please-manifest.json?*' }
 
         { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
@@ -149,8 +158,7 @@ Describe 'Stable promotion PR creation' {
 
     It 'does not treat a version file permission error as a missing file' {
         Mock Invoke-RestMethod {
-            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
-            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Version file forbidden', $response)
+            throw (New-TestHttpException -Message 'Version file forbidden' -StatusCode Forbidden)
         } -ParameterFilter { -not $Method -and $Uri -like '*/contents/version.txt?*' }
 
         { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
@@ -181,8 +189,7 @@ Describe 'Stable promotion PR creation' {
 
     It 'creates a branch only when the branch lookup returns 404' {
         Mock Invoke-RestMethod {
-            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
-            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Branch not found', $response)
+            throw (New-TestHttpException -Message 'Branch not found' -StatusCode NotFound)
         } -ParameterFilter { $Uri -like '*/git/ref/heads/release-please--branches--main' }
         Mock Invoke-RestMethod {
             param($Uri, $Method, $Body)
@@ -198,8 +205,7 @@ Describe 'Stable promotion PR creation' {
 
     It 'surfaces update errors without attempting branch creation' {
         Mock Invoke-RestMethod {
-            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
-            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Branch update failed', $response)
+            throw (New-TestHttpException -Message 'Branch update failed' -StatusCode NotFound)
         } -ParameterFilter { $Method -eq 'Patch' -and $Uri -like '*/git/refs/heads/*' }
 
         { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |

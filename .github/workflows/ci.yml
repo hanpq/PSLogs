@@ -33,7 +33,7 @@ jobs:
             os: windows-2022
             coverage_flag: windows-desktop
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -48,7 +48,7 @@ jobs:
         run: ./build.ps1 -Task Test
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: output/testResults/JaCoCo_coverage.xml
           flags: ${{ matrix.coverage_flag }}
