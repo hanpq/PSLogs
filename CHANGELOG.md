@@ -3,6 +3,32 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.0](https://github.com/hanpq/PSLogs/compare/v5.6.2...v5.7.0) (2026-10-29)
+
+### Bug Fixes
+
+* create prerelease PR ([76737c5](https://github.com/hanpq/PSLogs/commit/76737c551e3f484b16124cd236040244c6e08b29))
+
+* **release:** ensure correct handling of prerelease and stable promotion scenarios ([2e387a7](https://github.com/hanpq/PSLogs/commit/2e387a7891cd71dfb54332f0f8457273203fab68))
+
+* set prerelease to false in release configuration ([620e836](https://github.com/hanpq/PSLogs/commit/620e836c60af716fb500430d7d4b21b805ffe1b5))
+
+* change markdownlint configuration to disable MD013 rule ([0eeea4d](https://github.com/hanpq/PSLogs/commit/0eeea4d563d92b1c10d0dd207461ca25a267a1f4))
+
+* correct typo in PSLogs.psm1 comment ([0eeea4d](https://github.com/hanpq/PSLogs/commit/0eeea4d563d92b1c10d0dd207461ca25a267a1f4))
+
+* update target coverage threshold in codecov configuration ([904e1b2](https://github.com/hanpq/PSLogs/commit/904e1b238415dcd0aaea859d40bbb00fa06475e0))
+
+### Features
+
+* **tests:** add tests for branch update and creation logic in stable promotion ([60b0ddf](https://github.com/hanpq/PSLogs/commit/60b0ddf3bf84ca75f8f54b25802b59cc7a89c7a8))
+
+* **release:** add support for release channel selection and metadata validation ([2e387a7](https://github.com/hanpq/PSLogs/commit/2e387a7891cd71dfb54332f0f8457273203fab68))
+
+* **release:** enhance release workflow with stable promotion and validation checks ([2e387a7](https://github.com/hanpq/PSLogs/commit/2e387a7891cd71dfb54332f0f8457273203fab68))
+
+* **release:** consolidate stable release notes and update workflow scripts ([e6fb104](https://github.com/hanpq/PSLogs/commit/e6fb10475d2dd9bc50981f64ab310bcc650485c5))
+
 ## [5.7.0-beta004](https://github.com/hanpq/PSLogs/compare/v5.7.0-beta003...v5.7.0-beta004) (2026-10-29)
 
 
