@@ -14,6 +14,11 @@ param
     [string]
     $OutputDirectory,
 
+    [Parameter()]
+    [ValidateSet('All', 'Module', 'Infrastructure')]
+    [string]
+    $TestSuite = 'All',
+
     [Parameter(DontShow)]
     [switch]
     $InBuildProcess
@@ -30,6 +35,7 @@ if (-not $InBuildProcess)
         else { 'pwsh' }
     $executable = Join-Path $PSHOME $executableName
     $arguments = @('-NoProfile', '-NonInteractive', '-File', $PSCommandPath, '-InBuildProcess', '-Task', $Task)
+    $arguments += @('-TestSuite', $TestSuite)
 
     if ($PSBoundParameters.ContainsKey('Version'))
     {
@@ -252,7 +258,11 @@ function Invoke-ModuleTests
     (
         [Parameter(Mandatory)]
         [string]
-        $ModuleVersion
+        $ModuleVersion,
+
+        [ValidateSet('All', 'Module', 'Infrastructure')]
+        [string]
+        $TestSuite = 'All'
     )
 
     Write-Host 'Preparing Pester and PSScriptAnalyzer' -ForegroundColor Cyan
@@ -263,13 +273,18 @@ function Invoke-ModuleTests
     New-Item -ItemType Directory -Path $TestResultsDirectory -Force | Out-Null
 
     $configuration = New-PesterConfiguration
-    $configuration.Run.Path = Join-Path $PSScriptRoot 'tests'
+    $configuration.Run.Path = switch ($TestSuite)
+    {
+        'Module' { Join-Path $PSScriptRoot 'tests\Unit'; Join-Path $PSScriptRoot 'tests\QA' }
+        'Infrastructure' { Join-Path $PSScriptRoot 'tests\Build' }
+        'All' { Join-Path $PSScriptRoot 'tests' }
+    }
     $configuration.Run.PassThru = $true
     $configuration.Output.Verbosity = 'Detailed'
     $configuration.TestResult.Enabled = $true
     $configuration.TestResult.OutputFormat = 'NUnitXml'
     $configuration.TestResult.OutputPath = Join-Path $TestResultsDirectory "$ModuleName.Tests.xml"
-    $configuration.CodeCoverage.Enabled = $true
+    $configuration.CodeCoverage.Enabled = $TestSuite -ne 'Infrastructure'
     $configuration.CodeCoverage.Path = @(
         (Join-Path $PSScriptRoot 'source\Private\*.ps1'),
         (Join-Path $PSScriptRoot 'source\Public\*.ps1')
@@ -278,7 +293,7 @@ function Invoke-ModuleTests
     $configuration.CodeCoverage.OutputPath = Join-Path $TestResultsDirectory 'JaCoCo_coverage.xml'
     $configuration.CodeCoverage.CoveragePercentTarget = 1
 
-    Write-Host "Running Pester tests for $ModuleName $ModuleVersion (with code coverage)" -ForegroundColor Cyan
+    Write-Host "Running Pester tests for $ModuleName $ModuleVersion (suite: $TestSuite; coverage: $($configuration.CodeCoverage.Enabled.Value))" -ForegroundColor Cyan
     $result = Invoke-Pester -Configuration $configuration
 
     if ($result.Result -ne 'Passed')
@@ -361,7 +376,7 @@ switch ($Task)
 
         if ($Task -in @('Test', 'Verify'))
         {
-            Invoke-ModuleTests -ModuleVersion $resolvedVersion
+            Invoke-ModuleTests -ModuleVersion $resolvedVersion -TestSuite $TestSuite
         }
 
         if ($Task -eq 'Package')

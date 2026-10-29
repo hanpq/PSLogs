@@ -34,7 +34,7 @@ jobs:
 
       - name: Build and test release
         shell: pwsh
-        run: ./build.ps1 -Task Test
+        run: ./build.ps1 -Task Test -TestSuite Module
 
       - name: Package module
         shell: pwsh

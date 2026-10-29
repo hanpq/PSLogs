@@ -268,6 +268,21 @@ Describe 'Build test runner' {
         Should -Invoke Invoke-Pester -Times 0 -Exactly
     }
 
+    It 'selects <Suite> tests and coverage' -ForEach @(
+        @{ Suite = 'Module'; Directories = @('tests\Unit', 'tests\QA'); Coverage = $true }
+        @{ Suite = 'Infrastructure'; Directories = @('tests\Build'); Coverage = $false }
+        @{ Suite = 'All'; Directories = @('tests'); Coverage = $true }
+    ) {
+        Invoke-ModuleTests -ModuleVersion '1.2.3' -TestSuite $Suite
+
+        Should -Invoke Invoke-Pester -Times 1 -Exactly -ParameterFilter {
+            $expected = @($Directories | ForEach-Object { Join-Path $projectRoot $_ })
+            @($Configuration.Run.Path.Value).Count -eq $expected.Count -and
+            @(Compare-Object @($Configuration.Run.Path.Value) $expected).Count -eq 0 -and
+            $Configuration.CodeCoverage.Enabled.Value -eq $Coverage
+        }
+    }
+
     It 'fails when discovery fails without any failed tests' {
         Mock Invoke-Pester {
             [pscustomobject]@{
