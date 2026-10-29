@@ -175,13 +175,28 @@ foreach ($entry in @(
         @{ Path = 'CHANGELOG.md'; Content = $candidateChangelog }
     ))
 {
-    $file = Invoke-RestMethod -Uri "$api/contents/$($entry.Path)?ref=main" -Headers $headers
+    $file = $null
+    try
+    {
+        $file = Invoke-RestMethod -Uri "$api/contents/$($entry.Path)?ref=$baseSha" -Headers $headers
+    }
+    catch
+    {
+        if ($entry.Path -ne 'version.txt' -or [int]$_.Exception.Response.StatusCode -ne 404)
+        {
+            throw
+        }
+    }
     $payload = @{
         message = "chore(main): prepare stable promotion $stableVersion"
         branch  = $branch
-        sha     = $file.sha
         content = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($entry.Content))
-    } | ConvertTo-Json
+    }
+    if ($file)
+    {
+        $payload.sha = $file.sha
+    }
+    $payload = $payload | ConvertTo-Json
     Invoke-RestMethod -Method Put -Uri "$api/contents/$($entry.Path)" -Headers $headers `
         -ContentType 'application/json' -Body ([System.Text.Encoding]::UTF8.GetBytes($payload)) | Out-Null
 }

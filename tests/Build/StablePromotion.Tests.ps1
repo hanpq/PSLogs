@@ -120,6 +120,43 @@ Describe 'Stable promotion PR creation' {
         $updatedChangelog | Should -Match '## \[2\.0\.0-beta001\]'
     }
 
+    It 'creates version.txt without a sha when it is absent from the beta' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Version file not found', $response)
+        } -ParameterFilter { -not $Method -and $Uri -like '*/contents/version.txt?*' }
+
+        & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
+
+        $write = $apiState.Requests | Where-Object { $_.Method -eq 'Put' -and $_.Uri -like '*/contents/version.txt' }
+        $payload = [System.Text.Encoding]::UTF8.GetString([byte[]]$write.Body) | ConvertFrom-Json
+        $payload.PSObject.Properties.Name | Should -Not -Contain 'sha'
+        [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload.content)) |
+            Should -Be "2.0.0`n"
+    }
+
+    It 'does not ignore missing required release files' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Manifest not found', $response)
+        } -ParameterFilter { -not $Method -and $Uri -like '*/contents/.release-please-manifest.json?*' }
+
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
+            Should -Throw '*Manifest not found*'
+        @($apiState.Requests | Where-Object { $_.Method -eq 'Put' -and $_.Uri -like '*/contents/*' }).Count |
+            Should -Be 0
+    }
+
+    It 'does not treat a version file permission error as a missing file' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Version file forbidden', $response)
+        } -ParameterFilter { -not $Method -and $Uri -like '*/contents/version.txt?*' }
+
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
+            Should -Throw '*Version file forbidden*'
+    }
+
     It 'does not create a promotion while commits remain after the beta' {
         Set-Content -LiteralPath (Join-Path $fixtureRoot 'extra.txt') -Value 'post-beta change'
         & git -C $fixtureRoot add extra.txt
