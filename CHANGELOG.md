@@ -3,6 +3,13 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.0-beta004](https://github.com/hanpq/PSLogs/compare/v5.7.0-beta003...v5.7.0-beta004) (2026-10-29)
+
+
+### Bug Fixes
+
+* create prerelease PR ([76737c5](https://github.com/hanpq/PSLogs/commit/76737c551e3f484b16124cd236040244c6e08b29))
+
 ## [5.7.0-beta003](https://github.com/hanpq/PSLogs/compare/v5.7.0-beta002...v5.7.0-beta003) (2026-10-29)
 
 
