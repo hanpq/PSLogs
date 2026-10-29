@@ -146,9 +146,7 @@ if ($LASTEXITCODE -ne 0 -or $checkoutSha -cne $baseSha)
 try
 {
     $null = Invoke-RestMethod -Uri $branchReference -Headers $headers
-    $referencePayload = @{ sha = $baseSha; force = $true } | ConvertTo-Json
-    Invoke-RestMethod -Method Patch -Uri $branchReference -Headers $headers `
-        -ContentType 'application/json' -Body $referencePayload | Out-Null
+    $branchExists = $true
 }
 catch
 {
@@ -156,6 +154,16 @@ catch
     {
         throw
     }
+    $branchExists = $false
+}
+if ($branchExists)
+{
+    $referencePayload = @{ sha = $baseSha; force = $true } | ConvertTo-Json
+    Invoke-RestMethod -Method Patch -Uri "$api/git/refs/heads/$branch" -Headers $headers `
+        -ContentType 'application/json' -Body $referencePayload | Out-Null
+}
+else
+{
     $referencePayload = @{ ref = "refs/heads/$branch"; sha = $baseSha } | ConvertTo-Json
     Invoke-RestMethod -Method Post -Uri "$api/git/refs" -Headers $headers `
         -ContentType 'application/json' -Body $referencePayload | Out-Null

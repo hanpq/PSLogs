@@ -66,6 +66,10 @@ Describe 'Stable promotion PR creation' {
             }
             if ($Uri -like '*/git/ref/heads/release-please--branches--main')
             {
+                if ($Method)
+                {
+                    throw 'The singular ref endpoint only supports reading.'
+                }
                 return @{ object = @{ sha = 'old-branch-sha' } }
             }
             if ($Uri -like '*/contents/*')
@@ -124,6 +128,47 @@ Describe 'Stable promotion PR creation' {
         { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
             Should -Throw '*commit(s) after it*'
         $apiState.Requests.Count | Should -Be 0
+    }
+
+    It 'updates an existing branch through the plural refs endpoint' {
+        & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
+
+        $updates = @($apiState.Requests | Where-Object {
+            $_.Method -eq 'Patch' -and $_.Uri -like '*/git/refs/heads/*'
+        })
+        $updates.Count | Should -Be 1
+        ($updates[0].Body | ConvertFrom-Json).sha | Should -Be $apiState.MainSha
+        @($apiState.Requests | Where-Object { $_.Method -eq 'Post' -and $_.Uri -like '*/git/refs' }).Count |
+            Should -Be 0
+    }
+
+    It 'creates a branch only when the branch lookup returns 404' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Branch not found', $response)
+        } -ParameterFilter { $Uri -like '*/git/ref/heads/release-please--branches--main' }
+        Mock Invoke-RestMethod {
+            param($Uri, $Method, $Body)
+            $apiState.Requests.Add([pscustomobject]@{ Uri = $Uri; Method = $Method; Body = $Body })
+        } -ParameterFilter { $Method -eq 'Post' -and $Uri -like '*/git/refs' }
+
+        & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
+
+        $creates = @($apiState.Requests | Where-Object { $_.Method -eq 'Post' -and $_.Uri -like '*/git/refs' })
+        $creates.Count | Should -Be 1
+        ($creates[0].Body | ConvertFrom-Json).ref | Should -Be 'refs/heads/release-please--branches--main'
+    }
+
+    It 'surfaces update errors without attempting branch creation' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Branch update failed', $response)
+        } -ParameterFilter { $Method -eq 'Patch' -and $Uri -like '*/git/refs/heads/*' }
+
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
+            Should -Throw '*Branch update failed*'
+        @($apiState.Requests | Where-Object { $_.Method -eq 'Post' -and $_.Uri -like '*/git/refs' }).Count |
+            Should -Be 0
     }
 
     It 'protects an existing stable promotion PR from being recreated' {
