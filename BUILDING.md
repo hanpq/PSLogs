@@ -43,6 +43,8 @@ For background logging, run the script in a regular PowerShell terminal, then us
 
 The release workflow builds and tests the tag, attaches a ZIP to the GitHub release, and publishes the module to the PowerShell Gallery. Do not manually edit `.release-please-manifest.json` during routine development.
 
+After a beta cycle, the Release Please workflow automatically consolidates all prerelease notes since the previous stable version into the stable PR's changelog entry and release notes. Beta entries remain as history; beta releases keep incremental notes. Wait for the workflow to finish before merging. Missing or unrecognized release boundaries fail the workflow rather than silently omit notes; inspect the error and rerun after correcting the changelog.
+
 ## Publish a prerelease
 
 1. Make sure there is no stable release pull request waiting to be merged.

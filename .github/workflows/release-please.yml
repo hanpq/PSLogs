@@ -11,10 +11,27 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+      - name: Consolidate stable release notes
+        if: steps.release.outputs.pr != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: |
+          $pr = $env:RELEASE_PR | ConvertFrom-Json
+          & ./scripts/Update-StableReleaseNotes.ps1 -Repository $env:GITHUB_REPOSITORY -PullRequestNumber $pr.number
