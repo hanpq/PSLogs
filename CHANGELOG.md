@@ -3,6 +3,13 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.0-beta003](https://github.com/hanpq/PSLogs/compare/v5.7.0-beta002...v5.7.0-beta003) (2026-10-29)
+
+
+### Features
+
+* **tests:** add tests for branch update and creation logic in stable promotion ([60b0ddf](https://github.com/hanpq/PSLogs/commit/60b0ddf3bf84ca75f8f54b25802b59cc7a89c7a8))
+
 ## [5.7.0-beta002](https://github.com/hanpq/PSLogs/compare/v5.7.0-beta001...v5.7.0-beta002) (2026-10-29)
 
 
