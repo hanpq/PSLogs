@@ -3,6 +3,15 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.1](https://github.com/hanpq/PSLogs/compare/v5.7.0...v5.7.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* enhance test suite options and update documentation ([fdd9a81](https://github.com/hanpq/PSLogs/commit/fdd9a81ff4be71863205906e12d3025af497610b))
+* update actions/checkout and codecov-action to v6 and v5 respectively ([567d457](https://github.com/hanpq/PSLogs/commit/567d457175826f43d70d00345ad8488fe283f653))
+
+
 ## [5.7.1-beta001](https://github.com/hanpq/PSLogs/compare/v5.7.0...v5.7.1-beta001) (2026-10-29)
 
 
