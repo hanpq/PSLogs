@@ -3,6 +3,20 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.0-beta001](https://github.com/hanpq/PSLogs/compare/v5.6.2...v5.7.0-beta001) (2026-10-29)
+
+
+### Features
+
+* **release:** consolidate stable release notes and update workflow scripts ([e6fb104](https://github.com/hanpq/PSLogs/commit/e6fb10475d2dd9bc50981f64ab310bcc650485c5))
+
+
+### Bug Fixes
+
+* change markdownlint configuration to disable MD013 rule ([0eeea4d](https://github.com/hanpq/PSLogs/commit/0eeea4d563d92b1c10d0dd207461ca25a267a1f4))
+* correct typo in PSLogs.psm1 comment ([0eeea4d](https://github.com/hanpq/PSLogs/commit/0eeea4d563d92b1c10d0dd207461ca25a267a1f4))
+* update target coverage threshold in codecov configuration ([904e1b2](https://github.com/hanpq/PSLogs/commit/904e1b238415dcd0aaea859d40bbb00fa06475e0))
+
 ## [5.6.2](https://github.com/hanpq/PSLogs/compare/v5.6.2-beta002...v5.6.2) (2026-10-28)
 
 ### Bug Fixes
