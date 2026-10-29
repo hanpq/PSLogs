@@ -1,0 +1,50 @@
+{
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "file": ".github/copilot-instructions.md"
+        }
+    ],
+    "cSpell.words": [
+        "APITOKEN",
+        "autoloading",
+        "Bonvicini",
+        "defintion",
+        "docu",
+        "Dont",
+        "Elek",
+        "finalizers",
+        "gahujipo",
+        "GALLERYAPITOKEN",
+        "Gelf",
+        "GITHUBTOKEN",
+        "Glober",
+        "hanpq",
+        "itshorty",
+        "jangins",
+        "jeremymcgee",
+        "LASTEXITCODE",
+        "linefeeds",
+        "lookcloser",
+        "manualbashing",
+        "Massimo",
+        "mkdocs",
+        "notmatch",
+        "Ntfy",
+        "platyps",
+        "Powershellgallery",
+        "proxb",
+        "psake",
+        "PSHOME",
+        "PSTOOLS",
+        "runspace",
+        "runspaces",
+        "scriptblock",
+        "Tadas",
+        "timestamputc",
+        "tosoikea",
+        "voker",
+        "winevent"
+    ],
+    "cSpell.unknownWords": "report-common-typos",
+    "cSpell.numSuggestions": 4
+}

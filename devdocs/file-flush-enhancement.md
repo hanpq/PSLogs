@@ -5,11 +5,12 @@
 Currently, `Wait-Logging` only waits for the message queue to be emptied, but doesn't guarantee that the OS has actually flushed file data to disk. This can lead to data loss scenarios where:
 
 1. `Wait-Logging` completes successfully (queue is empty)
-2. PowerShell session terminates immediately after
-3. OS hasn't completed writing buffered data to disk
-4. Log data is lost
+1. PowerShell session terminates immediately after
+1. OS hasn't completed writing buffered data to disk
+1. Log data is lost
 
 This is particularly problematic in scenarios like:
+
 - Scheduled tasks that terminate immediately after logging
 - Scripts that exit right after critical error logging
 - Automated processes where log integrity is crucial
@@ -24,12 +25,14 @@ Wait-Logging  # Only waits for queue to be empty
 ## Requirements
 
 ### Functional Requirements
+
 - **No performance impact on normal logging**: File flushing should NOT occur during regular logging operations
 - **Explicit flushing only**: File buffers should only be flushed when `Wait-Logging` is explicitly called
 - **Order of operations**: Queue must be drained completely before any file flushing occurs
 - **Cross-platform compatibility**: Solution should work on Windows, Linux, and macOS
 
 ### Technical Requirements
+
 - Minimal changes to existing logging architecture
 - Thread-safe implementation for concurrent access
 - Graceful handling of disposed/closed file handles
@@ -43,7 +46,7 @@ Implement a module-scoped registry that tracks active file handles and provides 
 
 #### Architecture Overview
 
-```
+```flow
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Write-Log     │───▶│ Message Queue    │───▶│ Consumer        │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
@@ -60,13 +63,16 @@ Implement a module-scoped registry that tracks active file handles and provides 
 #### Implementation Details
 
 ##### 1. Module-Level Registry
+
 ```powershell
 # In Set-LoggingVariables or module initialization
 $Script:ActiveFileHandles = [System.Collections.Concurrent.ConcurrentDictionary[string, object]]::new()
 ```
 
 ##### 2. File Target Modifications
+
 Modify `source/include/File.ps1` to:
+
 - Use `FileStream` instead of `Out-File` for better control
 - Register file handles in the global registry
 - Implement proper disposal and cleanup
@@ -95,6 +101,7 @@ $Logger = {
 ```
 
 ##### 3. Wait-Logging Enhancement
+
 ```powershell
 function Wait-Logging {
     # ... existing parameter validation ...
@@ -125,7 +132,9 @@ function Wait-Logging {
 ```
 
 ##### 4. Cleanup and Disposal
+
 Handle cleanup in:
+
 - `Remove-LoggingTarget`: Remove handles for specific targets
 - `Stop-LoggingManager`: Dispose all handles during shutdown
 - Target disposal: When File targets are removed/replaced
@@ -143,55 +152,65 @@ if ($targetType -eq 'File' -and $Script:ActiveFileHandles.ContainsKey($targetPat
 ## Alternative Approaches Considered
 
 ### Message-Based Flush Command
+
 - **Pros**: Uses existing queue infrastructure
 - **Cons**: More complex, requires consumer runspace modifications, harder to synchronize
 
 ### Target-Level State Tracking
+
 - **Pros**: Self-contained per target
 - **Cons**: More complex enumeration, requires changes to all File target instances
 
 ### Callback-Based System
+
 - **Pros**: Extensible to other target types
 - **Cons**: Added complexity, function pointer management
 
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure
+
 1. Add `ActiveFileHandles` registry to module initialization
-2. Create helper functions for handle management
-3. Update `Wait-Logging` with flush logic
+1. Create helper functions for handle management
+1. Update `Wait-Logging` with flush logic
 
 ### Phase 2: File Target Updates
+
 1. Modify File target to use FileStream
-2. Implement handle registration/cleanup
-3. Add error handling and disposal logic
+1. Implement handle registration/cleanup
+1. Add error handling and disposal logic
 
 ### Phase 3: Integration & Testing
+
 1. Update existing tests for new behavior
-2. Add specific flush testing scenarios
-3. Test cross-platform compatibility
-4. Performance testing to ensure no regression
+1. Add specific flush testing scenarios
+1. Test cross-platform compatibility
+1. Performance testing to ensure no regression
 
 ### Phase 4: Documentation
+
 1. Update `Wait-Logging` documentation
-2. Add developer notes about file handle lifecycle
-3. Update examples and best practices
+1. Add developer notes about file handle lifecycle
+1. Update examples and best practices
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - Handle registration and cleanup
 - Flush operation success/failure scenarios
 - Concurrent access to file handles
 - Disposal edge cases
 
 ### Integration Tests
+
 - End-to-end logging with explicit flush verification
 - Multiple File targets with same/different paths
 - Performance impact measurement
 - Cross-platform compatibility
 
 ### Manual Testing Scenarios
+
 - Script termination after `Wait-Logging`
 - Large log files and buffer management
 - Network drives and slow I/O scenarios
@@ -200,24 +219,28 @@ if ($targetType -eq 'File' -and $Script:ActiveFileHandles.ContainsKey($targetPat
 ## Risks and Mitigations
 
 ### Risk: Memory Leaks from Unclosed Handles
+
 **Mitigation**: Implement proper disposal in all cleanup paths, add finalizers if needed
 
 ### Risk: Performance Impact on High-Volume Logging
+
 **Mitigation**: Only flush on explicit `Wait-Logging` calls, use efficient concurrent collections
 
 ### Risk: Cross-Platform FileStream Differences
+
 **Mitigation**: Feature detection for `FlushToDisk()`, fallback to standard `Flush()`
 
 ### Risk: Breaking Changes to File Target
+
 **Mitigation**: Maintain backward compatibility, extensive testing of existing scenarios
 
 ## Success Criteria
 
 1. **Functional**: `Wait-Logging` ensures all file data is committed to disk before returning
-2. **Performance**: No measurable impact on normal logging throughput
-3. **Reliability**: Proper cleanup prevents handle leaks and resource exhaustion
-4. **Compatibility**: Works across all supported PowerShell versions and platforms
-5. **Maintainability**: Clean, well-documented code that's easy to extend
+1. **Performance**: No measurable impact on normal logging throughput
+1. **Reliability**: Proper cleanup prevents handle leaks and resource exhaustion
+1. **Compatibility**: Works across all supported PowerShell versions and platforms
+1. **Maintainability**: Clean, well-documented code that's easy to extend
 
 ## Future Enhancements
 

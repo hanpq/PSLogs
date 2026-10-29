@@ -18,6 +18,16 @@ The default `Verify` task builds the module from `source/` and runs tests from `
 
 Import the generated module from `output/PSLogs/<version>/` to try it locally. Make changes in `source/`, not generated output under `output/`.
 
+### VS Code shortcuts
+
+- **Ctrl+Shift+B** runs `Verify` (build and tests). **Tasks: Run Task** also offers `build`, `test`, and `package`; `test` rebuilds first.
+- Select **PowerShell Debug Module (build first)** and press **F5**. It builds, then runs [ModuleDebug.ps1](ModuleDebug.ps1) in a temporary PowerShell console, avoiding stale module state. Keep manual end-user scenarios and breakpoints in that script.
+- To step into module functions, set breakpoints in the generated `output/PSLogs/<version>/PSLogs.psm1` after building. Rebuilds replace this file; edit only `source/`. Background logging runs in a separate runspace and is not stepped through by the normal script debugger.
+
+Tasks require PowerShell 7 (`pwsh` on PATH). Debugging requires the VS Code PowerShell extension and uses its selected PowerShell session.
+
+For background logging, run the script in a regular PowerShell terminal, then use **PowerShell Attach to Logging** and select its process. This targets the named `LoggingQueueConsumer` runspace. **PowerShell Attach to Runspace** instead prompts for both process and runspace.
+
 ## Submit a change
 
 1. Make and test your change on a branch.
