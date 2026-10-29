@@ -21,9 +21,13 @@ jobs:
         shell: pwsh
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_REF: ${{ github.ref_name }}
           RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          $project = ./scripts/Assert-ReleaseMetadata.ps1 -Tag $env:RELEASE_TAG -IsPrerelease ([bool]::Parse($env:RELEASE_PRERELEASE))
+          $project = ./scripts/Assert-ReleaseMetadata.ps1 `
+            -Tag $env:RELEASE_TAG `
+            -RefTag $env:RELEASE_REF `
+            -IsPrerelease ([bool]::Parse($env:RELEASE_PRERELEASE))
           "MODULE_NAME=$($project.Name)" >> $env:GITHUB_ENV
           "MODULE_VERSION=$($project.Version)" >> $env:GITHUB_ENV
           "MODULE_PATH=output/$($project.Name)/$($project.ModuleVersion)" >> $env:GITHUB_ENV
@@ -35,6 +39,19 @@ jobs:
       - name: Package module
         shell: pwsh
         run: ./build.ps1 -Task Package
+
+      - name: Validate packaged release metadata
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_REF: ${{ github.ref_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          ./scripts/Assert-ReleaseMetadata.ps1 `
+            -Tag $env:RELEASE_TAG `
+            -RefTag $env:RELEASE_REF `
+            -IsPrerelease ([bool]::Parse($env:RELEASE_PRERELEASE)) `
+            -BuiltModulePath (Join-Path $PWD $env:MODULE_PATH)
 
       - name: Publish to PowerShell Gallery
         shell: pwsh

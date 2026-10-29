@@ -27,13 +27,14 @@ if (-not $env:GITHUB_API_URL)
 }
 $pr = Invoke-RestMethod -Uri "$api/pulls/$PullRequestNumber" -Headers $headers
 if ($pr.state -ne 'open' -or $pr.head.repo.full_name -ne $Repository -or
-    'autorelease: pending' -notin $pr.labels.name)
+    'autorelease: pending' -notin $pr.labels.name -or
+    'stable-promotion' -notin $pr.labels.name)
 {
-    throw 'Expected an open Release Please PR with a branch in this repository.'
+    throw 'Expected an open stable promotion PR with a branch in this repository.'
 }
 
 $files = @{}
-foreach ($path in @('release-please-config.json', '.release-please-manifest.json', 'CHANGELOG.md'))
+foreach ($path in @('.release-please-manifest.json', 'CHANGELOG.md'))
 {
     $file = Invoke-RestMethod -Uri "$api/contents/${path}?ref=$($pr.head.sha)" -Headers $headers
     if ($file.encoding -ne 'base64')
@@ -45,18 +46,11 @@ foreach ($path in @('release-please-config.json', '.release-please-manifest.json
         Content = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($file.content))
     }
 }
-$config = $files['release-please-config.json'].Content | ConvertFrom-Json
-$configuredPrerelease = $config.packages.'.'.prerelease
-if ($configuredPrerelease -isnot [bool])
-{
-    throw 'Release Please must explicitly configure a boolean prerelease mode for the root package.'
-}
-if ($configuredPrerelease)
-{
-    Write-Output 'Prerelease mode: keeping incremental notes.'
-    return
-}
 $version = ($files['.release-please-manifest.json'].Content | ConvertFrom-Json).'.'
+if ($version -match '-')
+{
+    throw "Stable promotion PR must track a stable version, not '$version'."
+}
 $result = & (Join-Path $PSScriptRoot 'Get-StableReleaseNotes.ps1') `
     -Changelog $files['CHANGELOG.md'].Content -PullRequestBody $pr.body -Version $version
 if (-not $result.RolledUp)

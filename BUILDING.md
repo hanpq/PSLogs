@@ -35,24 +35,19 @@ For background logging, run the script in a regular PowerShell terminal, then us
 3. Use a Conventional Commit title for changes that should trigger a release. `feat:` requests a minor release; `fix:` and `perf:` request a patch; `!` or a `BREAKING CHANGE:` footer requests a major release. `docs:`, `test:`, and `chore:` do not trigger releases.
 4. Squash-merge using the PR title as the commit message so Release Please can determine the correct version and generate release notes.
 
-## Publish a stable release
+## Release channel cheat sheet
 
-1. After release-worthy changes reach `main`, Release Please opens or updates a release pull request.
-2. Review the proposed version and generated notes. Compare them with `## [Unreleased]` in `CHANGELOG.md`; move relevant missing bullets into the release notes and remove stale bullets.
-3. Wait for CI, then merge the release pull request.
+| How it starts | Channel | What happens |
+| --- | --- | --- |
+| Push or merge to `main` | Beta | Release Please opens or updates the beta release PR when conventional commits warrant one. |
+| **Actions → Release Please → Run workflow → `beta`** | Beta | Runs the same beta release check manually. |
+| **Actions → Release Please → Run workflow → `stable`** | Stable promotion | Opens a stable promotion PR for the latest published beta, even when there have been zero commits since it. |
 
-The release workflow builds and tests the tag, attaches a ZIP to the GitHub release, and publishes the module to the PowerShell Gallery. Do not manually edit `.release-please-manifest.json` during routine development.
+Review the release PR version and notes, wait for CI, and merge it to publish. The release PR remains the gate for both channels. A stable promotion requires the latest beta to be published and `main` to have no commits after that beta; merge any pending beta release first. It creates a metadata-only release PR, so no config toggle or dummy fix commit is needed. Stable notes roll up beta entries since the previous stable release; beta entries remain in the changelog. Missing or unrecognized release boundaries fail the workflow instead of silently omitting notes.
 
-After a beta cycle, the Release Please workflow automatically consolidates all prerelease notes since the previous stable version into the stable PR's changelog entry and release notes. Beta entries remain as history; beta releases keep incremental notes. Wait for the workflow to finish before merging. Missing or unrecognized release boundaries fail the workflow rather than silently omit notes; inspect the error and rerun after correcting the changelog.
+An open stable promotion is protected from automatic beta runs. When it merges, the `stable-promotion` label selects the checked-in stable Release Please configuration for tag/release creation; beta pushes continue using the beta configuration. The release workflow checks that the immutable tag, tracked version, GitHub prerelease flag, and built module manifest agree before publishing.
 
-## Publish a prerelease
-
-1. Make sure there is no stable release pull request waiting to be merged.
-2. Set `"prerelease": true` in `release-please-config.json` and push that configuration change with a non-release commit, such as `chore: enable prerelease`.
-3. Push a release-worthy `fix:` or `feat:` commit. Release Please opens a beta release pull request.
-4. Review the version and notes, wait for CI, and merge the pull request to publish the beta. Repeat with further release-worthy changes for later beta numbers.
-
-To promote a beta to stable, set `"prerelease": false` and push a `fix:` commit. Review the proposed stable version before merging the resulting release pull request. Keep the `"versioning": "prerelease"` strategy configured; inspect the proposed version because features or breaking changes during the beta cycle can change it.
+The release workflow builds and tests the tag, attaches a ZIP to the GitHub release, and publishes the module to the PowerShell Gallery. Do not edit `.release-please-manifest.json` or toggle release configuration during routine development.
 
 Prereleases use padded labels such as `beta001`. Users must opt in when installing, for example:
 

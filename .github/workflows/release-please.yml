@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options:
+          - beta
+          - stable
+        default: beta
+        required: true
 
 permissions:
   contents: write
@@ -21,17 +30,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: googleapis/release-please-action@v4
-        id: release
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-      - name: Consolidate stable release notes
-        if: steps.release.outputs.pr != ''
+      - name: Resolve release channel
+        id: channel
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          RELEASE_PR: ${{ steps.release.outputs.pr }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          DISPATCH_CHANNEL: ${{ inputs.channel }}
         run: |
-          $pr = $env:RELEASE_PR | ConvertFrom-Json
-          & ./scripts/Update-StableReleaseNotes.ps1 -Repository $env:GITHUB_REPOSITORY -PullRequestNumber $pr.number
+          $parameters = @{
+            EventName = $env:GITHUB_EVENT_NAME
+            CommitSha = $env:GITHUB_SHA
+            RefName = $env:GITHUB_REF_NAME
+            Repository = $env:GITHUB_REPOSITORY
+          }
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $parameters.DispatchChannel = $env:DISPATCH_CHANNEL
+          }
+          $result = ./scripts/Get-ReleaseChannel.ps1 @parameters
+          "channel=$($result.Channel)" >> $env:GITHUB_OUTPUT
+          "skip=$($result.Skip.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "run-action=$($result.RunAction.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+      - name: Create stable promotion pull request
+        if: github.event_name == 'workflow_dispatch' && steps.channel.outputs.channel == 'stable'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
+        run: |
+          $pullRequestNumber = ./scripts/New-StablePromotion.ps1
+          ./scripts/Update-StableReleaseNotes.ps1 `
+            -Repository $env:GITHUB_REPOSITORY `
+            -PullRequestNumber $pullRequestNumber
+      - uses: googleapis/release-please-action@v4
+        if: steps.channel.outputs.run-action == 'true' && steps.channel.outputs.skip != 'true'
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: ${{ steps.channel.outputs.channel == 'stable' && 'release-please-stable-config.json' || 'release-please-config.json' }}

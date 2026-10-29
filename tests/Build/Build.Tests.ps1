@@ -153,20 +153,18 @@ Describe 'Release publication guards' {
         New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3' }"
         Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
-        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{"prerelease":true}}}'
     }
 
     It 'accepts a matching prerelease' {
-        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -RefTag 'v1.3.0-beta001' -IsPrerelease $true
 
         $project.Version | Should -Be '1.3.0-beta001'
     }
 
     It 'accepts promotion to the same numeric stable version' {
         Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
-        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{"prerelease":false}}}'
 
-        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -RefTag 'v1.3.0' -IsPrerelease $false
 
         $project.Version | Should -Be '1.3.0'
     }
@@ -188,18 +186,30 @@ Describe 'Release publication guards' {
             Should -Throw '*GitHub prerelease flag*'
     }
 
-    It 'rejects a stable release while prerelease mode is enabled' {
-        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
-
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false } |
-            Should -Throw '*Release Please prerelease mode*'
+    It 'rejects an event tag that differs from the checked-out ref' {
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -RefTag 'v1.3.0-beta002' -IsPrerelease $true } |
+            Should -Throw '*does not match checked-out ref*'
     }
 
-    It 'rejects a missing release mode rather than assuming stable' {
-        Set-Content -LiteralPath (Join-Path $fixtureRoot 'release-please-config.json') -Value '{"packages":{".":{}}}'
+    It 'accepts a built manifest matching the immutable release metadata' {
+        $builtModulePath = Join-Path $fixtureRoot 'built'
+        New-Item -ItemType Directory -Path $builtModulePath | Out-Null
+        Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = 'beta001' } } }"
 
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true } |
-            Should -Throw '*explicitly configure a boolean prerelease mode*'
+        $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' `
+            -RefTag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath
+
+        $project.Version | Should -Be '1.3.0-beta001'
+    }
+
+    It 'rejects a built manifest that disagrees with the immutable release metadata' {
+        $builtModulePath = Join-Path $fixtureRoot 'built'
+        New-Item -ItemType Directory -Path $builtModulePath | Out-Null
+        Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = '' } } }"
+
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' `
+            -RefTag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
+            Should -Throw '*does not match tracked version*'
     }
 }
 

@@ -164,7 +164,7 @@ Describe 'Release PR workflow integration' {
         $apiState = @{
             PrBody = $body
             ChangelogContent = $fixture
-            Prerelease = $false
+            ManifestContent = '{".":"2.0.0"}'
             BranchChanged = $false
             Reads = 0
             Writes = [System.Collections.Generic.List[object]]::new()
@@ -187,14 +187,13 @@ Describe 'Release PR workflow integration' {
                         ref = 'release-please--branches--main'
                         repo = @{ full_name = 'example/module' }
                     }
-                    labels = @(@{ name = 'autorelease: pending' })
+                    labels = @(@{ name = 'autorelease: pending' }, @{ name = 'stable-promotion' })
                     body = $apiState.PrBody
                 }
             }
             $content = switch -Wildcard ([string]$Uri)
             {
-                '*/contents/release-please-config.json?*' { @{ packages = @{ '.' = @{ prerelease = $apiState.Prerelease } } } | ConvertTo-Json -Depth 5 }
-                '*/contents/.release-please-manifest.json?*' { '{".":"2.0.0"}' }
+                '*/contents/.release-please-manifest.json?*' { $apiState.ManifestContent }
                 '*/contents/CHANGELOG.md?*' { $apiState.ChangelogContent }
                 default { throw "Unexpected API URI: $Uri" }
             }
@@ -220,16 +219,10 @@ Describe 'Release PR workflow integration' {
         $apiState.Writes[1].Payload.body | Should -Match 'handle empty messages'
     }
 
-    It 'leaves beta PRs unchanged' {
-        $apiState.Prerelease = $true
-        & $updateScript -Repository 'example/module' -PullRequestNumber 42
-        $apiState.Writes.Count | Should -Be 0
-    }
-
-    It 'rejects invalid release mode configuration' {
-        $apiState.Prerelease = 'false'
+    It 'rejects prerelease metadata on a stable promotion PR' {
+        $apiState.ManifestContent = '{".":"2.0.0-beta002"}'
         { & $updateScript -Repository 'example/module' -PullRequestNumber 42 } |
-            Should -Throw '*boolean prerelease mode*'
+            Should -Throw '*must track a stable version*'
         $apiState.Writes.Count | Should -Be 0
     }
 
@@ -267,7 +260,7 @@ Describe 'Release PR workflow integration' {
             @{ state = 'closed'; head = @{ repo = @{ full_name = 'example/other' } }; labels = @() }
         }
         { & $updateScript -Repository 'example/module' -PullRequestNumber 42 } |
-            Should -Throw '*open Release Please PR*'
+            Should -Throw '*open stable promotion PR*'
         $apiState.Writes.Count | Should -Be 0
     }
 
