@@ -3,6 +3,14 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.2-beta002](https://github.com/hanpq/PSLogs/compare/v5.7.2-beta001...v5.7.2-beta002) (2026-10-30)
+
+
+### Bug Fixes
+
+* **ci:** unroll GitHub API list responses in release scripts ([ff12576](https://github.com/hanpq/PSLogs/commit/ff12576e546f78d0d161c56b49cfc005328e0395))
+* improve QA test performance ([09784b5](https://github.com/hanpq/PSLogs/commit/09784b500d20ae66c4c430e9292f3d7177835110))
+
 ## [5.7.2-beta001](https://github.com/hanpq/PSLogs/compare/v5.7.1...v5.7.2-beta001) (2026-10-30)
 
 
