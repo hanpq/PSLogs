@@ -43,7 +43,7 @@ jobs:
           $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
           $page = 1
           do {
-            $pulls = @(Invoke-RestMethod -Headers $headers -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100&page=$page")
+            $pulls = @(Invoke-RestMethod -Headers $headers -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100&page=$page" | ForEach-Object { $_ })
             foreach ($pr in $pulls) {
               if ('stable-promotion' -in $pr.labels.name -or
                   ($pr.head.ref -ceq 'release-please--branches--main' -and $pr.title -match '^chore\(main\): release \d+\.\d+\.\d+$')) {

@@ -69,7 +69,8 @@ $publishedBetas = @()
 $page = 1
 do
 {
-    $releases = @(Invoke-RestMethod -Uri "$api/releases?per_page=100&page=$page" -Headers $headers)
+    # Invoke-RestMethod emits a JSON array as one object; ForEach-Object unrolls it.
+    $releases = @(Invoke-RestMethod -Uri "$api/releases?per_page=100&page=$page" -Headers $headers | ForEach-Object { $_ })
     $publishedBetas += @($releases | Where-Object {
         $_.prerelease -and -not $_.draft -and $_.published_at -and $_.tag_name -cmatch '^v\d+\.\d+\.\d+-beta[0-9]{3,}$'
     })
@@ -137,7 +138,7 @@ $pullRequests = @()
 $page = 1
 do
 {
-    $pagePullRequests = @(Invoke-RestMethod -Uri "$api/pulls?state=open&base=main&per_page=100&page=$page" -Headers $headers)
+    $pagePullRequests = @(Invoke-RestMethod -Uri "$api/pulls?state=open&base=main    &per_page=100&page=$page" -Headers $headers | ForEach-Object { $_ })
     $pullRequests += $pagePullRequests
     $page++
 } while ($pagePullRequests.Count -eq 100)

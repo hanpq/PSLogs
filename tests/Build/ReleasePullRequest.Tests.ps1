@@ -50,8 +50,9 @@ Describe 'Merged release PR validation' {
                 '*/user' { return @{ login = 'release-bot' } }
                 '*/pulls/42' { return $apiState.Pr }
                 '*/pulls/43' { return $apiState.Other }
-                '*/pulls/42/files?*' { return $apiState.Files }
-                '*/issues?*' { return $apiState.Pending }
+                # The real cmdlet returns JSON arrays as a single object.
+                '*/pulls/42/files?*' { return , $apiState.Files }
+                '*/issues?*' { return , $apiState.Pending }
                 '*/git/commits/merged-sha' { return @{ parents = @(@{ sha = 'beta-sha' }) } }
                 '*/commits/v2.0.0-beta001' { return @{ sha = $apiState.BetaCommit } }
                 '*/releases/tags/v2.0.0-beta001' { return $apiState.BetaRelease }

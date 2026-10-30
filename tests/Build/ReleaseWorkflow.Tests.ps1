@@ -77,7 +77,8 @@ Describe 'Manual beta preparation guard' {
                     content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((@{ '.' = $apiState.Version } | ConvertTo-Json)))
                 }
             }
-            return $apiState.Pulls
+            # The real cmdlet returns JSON arrays as a single object.
+            return , @($apiState.Pulls)
         }
     }
 
@@ -125,8 +126,8 @@ Describe 'Manual beta preparation guard' {
     It 'checks later pages for stable promotions' {
         Mock Invoke-RestMethod {
             param($Uri)
-            if ($Uri -like '*page=1') { return (1..100 | ForEach-Object { @{ number = $_; labels = @() } }) }
-            return @(@{ number = 101; labels = @(@{ name = 'stable-promotion' }) })
+            if ($Uri -like '*page=1') { return , @(1..100 | ForEach-Object { @{ number = $_; labels = @() } }) }
+            return , @(@{ number = 101; labels = @(@{ name = 'stable-promotion' }) })
         }
         { & $guard } | Should -Throw '*Stable promotion #101 is pending*'
     }

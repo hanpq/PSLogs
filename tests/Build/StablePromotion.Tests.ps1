@@ -1,6 +1,16 @@
 BeforeAll {
     $scriptUnderTest = Join-Path $PSScriptRoot '..\..\scripts\New-StablePromotion.ps1'
 
+    function git
+    {
+        param(
+            [Parameter(ValueFromRemainingArguments)]
+            [string[]]$Arguments
+        )
+
+        throw "Unexpected unmocked Git command: $Arguments"
+    }
+
     function New-TestHttpException
     {
         param([string]$Message, [System.Net.HttpStatusCode]$StatusCode)
@@ -17,6 +27,7 @@ Describe 'Stable promotion PR creation' {
     BeforeAll {
         $savedToken = $env:GH_TOKEN
         $savedApi = $env:GITHUB_API_URL
+        $savedGitExitCode = $global:LASTEXITCODE
         $env:GH_TOKEN = 'test-token'
         $env:GITHUB_API_URL = 'https://api.github.test'
     }
@@ -24,6 +35,7 @@ Describe 'Stable promotion PR creation' {
     AfterAll {
         $env:GH_TOKEN = $savedToken
         $env:GITHUB_API_URL = $savedApi
+        $global:LASTEXITCODE = $savedGitExitCode
     }
 
     BeforeEach {
@@ -47,18 +59,35 @@ Describe 'Stable promotion PR creation' {
 
 * old stable feature
 '@
-        & git -C $fixtureRoot init --quiet -b main
-        & git -C $fixtureRoot config user.name 'Release Tests'
-        & git -C $fixtureRoot config user.email 'release-tests@example.test'
-        & git -C $fixtureRoot add --all
-        & git -C $fixtureRoot commit --quiet -m 'chore: publish beta'
-        & git -C $fixtureRoot tag v2.0.0-beta001
+        $gitState = @{
+            CheckoutSha = '0123456789abcdef0123456789abcdef01234567'
+            BetaSha = '0123456789abcdef0123456789abcdef01234567'
+            CommitsAfterBeta = 0
+        }
+        Mock git {
+            param($Arguments)
+
+            if ($Arguments.Count -lt 3 -or $Arguments[0] -cne '-C' -or $Arguments[1] -cne $fixtureRoot)
+            {
+                throw "Unexpected Git arguments: $Arguments"
+            }
+
+            $global:LASTEXITCODE = 0
+            switch -Exact ($Arguments[2..($Arguments.Count - 1)] -join ' ')
+            {
+                'rev-parse --verify refs/tags/v2.0.0-beta001' { return $gitState.BetaSha }
+                'rev-list --count v2.0.0-beta001..HEAD' { return $gitState.CommitsAfterBeta }
+                'rev-parse v2.0.0-beta001^{commit}' { return $gitState.BetaSha }
+                'rev-parse HEAD' { return $gitState.CheckoutSha }
+                default { throw "Unexpected Git command: $Arguments" }
+            }
+        }
 
         $apiState = @{
             Requests = [System.Collections.Generic.List[object]]::new()
             OpenPullRequests = @()
             Writes = [System.Collections.Generic.List[object]]::new()
-            MainSha = (& git -C $fixtureRoot rev-parse HEAD)
+            MainSha = $gitState.CheckoutSha
             Release = @{ prerelease = $true; draft = $false; tag_name = 'v2.0.0-beta001'; published_at = '2026-10-29T12:00:00Z' }
             OtherBetas = @()
         }
@@ -71,11 +100,12 @@ Describe 'Stable promotion PR creation' {
             }
             if ($Uri -like '*/releases?*')
             {
-                return @($apiState.Release) + $apiState.OtherBetas
+                # The real cmdlet returns JSON arrays as a single object.
+                return , (@($apiState.Release) + $apiState.OtherBetas)
             }
             if ($Uri -like '*/pulls?state=open*')
             {
-                return $apiState.OpenPullRequests
+                return , @($apiState.OpenPullRequests)
             }
             if ($Uri -like '*/git/ref/heads/main')
             {
@@ -220,9 +250,7 @@ Describe 'Stable promotion PR creation' {
     }
 
     It 'does not create a promotion while commits remain after the beta' {
-        Set-Content -LiteralPath (Join-Path $fixtureRoot 'extra.txt') -Value 'post-beta change'
-        & git -C $fixtureRoot add extra.txt
-        & git -C $fixtureRoot commit --quiet -m 'fix: post-beta change'
+        $gitState.CommitsAfterBeta = 1
 
         { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
             Should -Throw '*commit(s) after it*'

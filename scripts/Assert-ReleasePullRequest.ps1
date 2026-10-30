@@ -37,7 +37,8 @@ if (-not $author.login -or $pr.user.login -cne $author.login -or
     throw 'Expected a merged, same-repository Release Please PR authored by the release token owner.'
 }
 
-$files = @(Invoke-RestMethod -Uri "$api/pulls/$PullRequestNumber/files?per_page=100" -Headers $headers)
+# Invoke-RestMethod emits a JSON array as one object; ForEach-Object unrolls it.
+$files = @(Invoke-RestMethod -Uri "$api/pulls/$PullRequestNumber/files?per_page=100" -Headers $headers | ForEach-Object { $_ })
 if ($files.Count -ne 3 -or $pr.changed_files -ne 3 -or
     @($files | Where-Object {
         $_.filename -notin @('.release-please-manifest.json', 'version.txt', 'CHANGELOG.md') -or
@@ -102,7 +103,7 @@ if ($channel -eq 'stable')
 $page = 1
 do
 {
-    $pending = @(Invoke-RestMethod -Uri "$api/issues?state=closed&labels=autorelease%3A%20pending&per_page=100&page=$page" -Headers $headers)
+    $pending = @(Invoke-RestMethod -Uri "$api/issues?state=closed&labels=autorelease%3A%20pending&per_page=100&page=$page" -Headers $headers | ForEach-Object { $_ })
     foreach ($issue in $pending)
     {
         if ($issue.pull_request -and $issue.number -ne $PullRequestNumber)
