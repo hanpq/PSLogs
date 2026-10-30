@@ -39,7 +39,7 @@ For background logging, run the script in a regular PowerShell terminal, then us
 ## Submit a change
 
 1. Make and test your change on a branch.
-2. Open a pull request against `main`. CI runs for pull requests and pushes to `main`.
+2. Open a pull request against `main`. CI runs for pull requests and pushes to `main`. Pushes that only change release metadata (`.release-please-manifest.json`, `version.txt`, `CHANGELOG.md`), such as merged release PRs, skip CI on `main` because the PR and the release workflow already test them.
 3. Use a Conventional Commit title for changes that should trigger a release. `feat:` requests a minor release; `fix:` and `perf:` request a patch; `!` or a `BREAKING CHANGE:` footer requests a major release. `docs:`, `test:`, and `chore:` do not trigger releases.
 4. Squash-merge using the PR title as the commit message so Release Please can determine the correct version and generate release notes.
 

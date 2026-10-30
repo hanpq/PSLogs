@@ -7,6 +7,11 @@ on:
   push:
     branches:
       - main
+    # Release PR merges only touch release metadata; the PR checks and release.yml already test them.
+    paths-ignore:
+      - .release-please-manifest.json
+      - version.txt
+      - CHANGELOG.md
   workflow_dispatch:
 
 permissions:
