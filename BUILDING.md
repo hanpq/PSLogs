@@ -81,3 +81,7 @@ Install-Module PSLogs -AllowPrerelease
 ```
 
 The build uses these pinned dependencies from `output/RequiredModules`; you do not need to install them separately.
+
+## Reuse this pipeline in other modules
+
+See [pipeline-migration-kit/README.md](pipeline-migration-kit/README.md) to migrate another module from Sampler, or to update an already migrated module.

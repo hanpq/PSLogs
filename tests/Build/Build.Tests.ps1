@@ -100,6 +100,36 @@ Describe 'Module metadata discovery' {
 }
 
 Describe 'Module packaging' {
+    It 'passes only the optional source parts that exist to ModuleBuilder' -ForEach @(
+        @{ Parts = @(); ExpectedCopyPaths = $null; ExpectedPrefix = $null; ExpectedSuffix = $null }
+        @{ Parts = @('en-US', 'prefix.ps1'); ExpectedCopyPaths = @('en-US'); ExpectedPrefix = 'prefix.ps1'; ExpectedSuffix = $null }
+        @{ Parts = @('en-US', 'include', 'prefix.ps1', 'suffix.ps1'); ExpectedCopyPaths = @('en-US', 'include'); ExpectedPrefix = 'prefix.ps1'; ExpectedSuffix = 'suffix.ps1' }
+    ) {
+        function Build-Module
+        {
+            [CmdletBinding()]
+            param($SourcePath, $OutputDirectory, $SemVer, $Encoding, $CopyPaths, $Prefix, $Suffix)
+        }
+        $sourceDirectory = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        New-Item -ItemType Directory -Path $sourceDirectory -Force | Out-Null
+        $SourceManifest = Join-Path $sourceDirectory "$ModuleName.psd1"
+        Set-Content -LiteralPath $SourceManifest -Value "@{ ModuleVersion = '1.2.3' }"
+        foreach ($part in $Parts)
+        {
+            $type = if ($part -like '*.ps1') { 'File' } else { 'Directory' }
+            New-Item -ItemType $type -Path (Join-Path $sourceDirectory $part) -Force | Out-Null
+        }
+        $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
+        Mock Import-BuildModule { }
+        Mock Build-Module { throw 'stop after capturing parameters' }
+
+        { Build-ProjectModule -ModuleVersion '1.2.3' } | Should -Throw '*stop after capturing parameters*'
+
+        Should -Invoke Build-Module -Times 1 -Exactly -ParameterFilter {
+            "$CopyPaths" -eq "$ExpectedCopyPaths" -and "$Prefix" -eq "$ExpectedPrefix" -and "$Suffix" -eq "$ExpectedSuffix"
+        }
+    }
+
     It 'rebuilds rather than packaging a different release from the same numeric directory' {
         $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
         $moduleDirectory = Join-Path $BuiltModuleDirectory '1.2.3'

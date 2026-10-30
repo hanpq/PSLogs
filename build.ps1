@@ -199,11 +199,24 @@ function Build-ProjectModule
         SourcePath               = $SourceManifest
         OutputDirectory          = $OutputDirectory
         SemVer                   = $ModuleVersion
-        CopyPaths                = @('en-US', 'include')
         Encoding                 = 'UTF8'
-        Prefix                   = 'prefix.ps1'
-        Suffix                   = 'suffix.ps1'
         ErrorAction              = 'Stop'
+    }
+
+    # Optional source layout; modules without these files or folders still build.
+    $sourceDirectory = Split-Path -Parent $SourceManifest
+    $copyPaths = @(@('en-US', 'include') | Where-Object { Test-Path -LiteralPath (Join-Path $sourceDirectory $_) })
+    if ($copyPaths.Count -gt 0)
+    {
+        $buildParameters.CopyPaths = $copyPaths
+    }
+    foreach ($part in @('Prefix', 'Suffix'))
+    {
+        $partFile = "$($part.ToLowerInvariant()).ps1"
+        if (Test-Path -LiteralPath (Join-Path $sourceDirectory $partFile))
+        {
+            $buildParameters[$part] = $partFile
+        }
     }
 
     Build-Module @buildParameters | Out-Host
@@ -284,11 +297,11 @@ function Invoke-ModuleTests
     $configuration.TestResult.Enabled = $true
     $configuration.TestResult.OutputFormat = 'NUnitXml'
     $configuration.TestResult.OutputPath = Join-Path $TestResultsDirectory "$ModuleName.Tests.xml"
-    $configuration.CodeCoverage.Enabled = $TestSuite -ne 'Infrastructure'
-    $configuration.CodeCoverage.Path = @(
-        (Join-Path $PSScriptRoot 'source\Private\*.ps1'),
-        (Join-Path $PSScriptRoot 'source\Public\*.ps1')
-    )
+    $coveragePaths = @(@('Private', 'Public') |
+            Where-Object { Test-Path -LiteralPath (Join-Path $PSScriptRoot "source\$_") } |
+            ForEach-Object { Join-Path $PSScriptRoot "source\$_\*.ps1" })
+    $configuration.CodeCoverage.Enabled = $TestSuite -ne 'Infrastructure' -and $coveragePaths.Count -gt 0
+    $configuration.CodeCoverage.Path = $coveragePaths
     $configuration.CodeCoverage.OutputFormat = 'JaCoCo'
     $configuration.CodeCoverage.OutputPath = Join-Path $TestResultsDirectory 'JaCoCo_coverage.xml'
     $configuration.CodeCoverage.CoveragePercentTarget = 1
