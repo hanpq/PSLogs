@@ -59,13 +59,19 @@ Describe 'Stable promotion PR creation' {
             OpenPullRequests = @()
             Writes = [System.Collections.Generic.List[object]]::new()
             MainSha = (& git -C $fixtureRoot rev-parse HEAD)
+            Release = @{ prerelease = $true; draft = $false; tag_name = 'v2.0.0-beta001'; published_at = '2026-10-29T12:00:00Z' }
+            OtherBetas = @()
         }
         Mock Invoke-RestMethod {
             param($Uri, $Method, $Body)
             $apiState.Requests.Add([pscustomobject]@{ Uri = $Uri; Method = $Method; Body = $Body })
             if ($Uri -like '*/releases/tags/*')
             {
-                return @{ prerelease = $true; tag_name = 'v2.0.0-beta001' }
+                return $apiState.Release
+            }
+            if ($Uri -like '*/releases?*')
+            {
+                return @($apiState.Release) + $apiState.OtherBetas
             }
             if ($Uri -like '*/pulls?state=open*')
             {
@@ -143,6 +149,54 @@ Describe 'Stable promotion PR creation' {
         $payload.PSObject.Properties.Name | Should -Not -Contain 'sha'
         [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload.content)) |
             Should -Be "2.0.0`n"
+    }
+
+    It 'rolls up all beta notes before writing the promotion, preserving beta history' {
+        $changelogPath = Join-Path $fixtureRoot 'CHANGELOG.md'
+        $changelog = Get-Content $changelogPath -Raw
+        $olderBeta = @'
+## [1.1.0-beta001](https://github.com/example/module/compare/v1.0.0...v1.1.0-beta001) (2026-10-28)
+
+### Bug Fixes
+
+* earlier beta fix
+
+'@
+        $changelog = $changelog.Replace('compare/v1.0.0...v2.0.0-beta001', 'compare/v1.1.0-beta001...v2.0.0-beta001')
+        $changelog = $changelog.Replace('## [1.0.0]', "$olderBeta`n## [1.0.0]")
+        Set-Content $changelogPath $changelog
+        & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
+        $write = $apiState.Requests | Where-Object { $_.Method -eq 'Put' -and $_.Uri -like '*/contents/CHANGELOG.md' }
+        $payload = [System.Text.Encoding]::UTF8.GetString([byte[]]$write.Body) | ConvertFrom-Json
+        $result = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload.content))
+        $stableSection = ($result -split '(?m)^## \[2.0.0-beta001\]')[0]
+        $stableSection | Should -Match 'earlier beta fix'
+        $stableSection | Should -Match 'beta feature'
+        $stableSection | Should -Match 'compare/v1.0.0...v2.0.0'
+        $result | Should -Match '## \[1.1.0-beta001\]'
+        $request = $apiState.Requests | Where-Object { $_.Method -eq 'Post' -and $_.Uri -like '*/pulls' }
+        $pr = [System.Text.Encoding]::UTF8.GetString([byte[]]$request.Body) | ConvertFrom-Json
+        $pr.body | Should -Match 'earlier beta fix'
+    }
+
+    It 'rejects a draft or unpublished beta' -ForEach @(
+        @{ Draft = $true; Published = '2026-10-29T12:00:00Z' }
+        @{ Draft = $false; Published = $null }
+    ) {
+        $apiState.Release.draft = $Draft
+        $apiState.Release.published_at = $Published
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
+            Should -Throw '*missing or is not marked*'
+        @($apiState.Requests | Where-Object Method -in @('Put', 'Patch', 'Post')).Count | Should -Be 0
+    }
+
+    It 'rejects a tracked beta older than the latest published beta' {
+        $apiState.OtherBetas = @(@{
+            prerelease = $true; draft = $false; tag_name = 'v2.0.0-beta002'; published_at = '2026-10-30T12:00:00Z'
+        })
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
+            Should -Throw '*latest published beta*'
+        @($apiState.Requests | Where-Object Method -in @('Put', 'Patch', 'Post')).Count | Should -Be 0
     }
 
     It 'does not ignore missing required release files' {

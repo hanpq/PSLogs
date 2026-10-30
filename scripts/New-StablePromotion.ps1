@@ -47,6 +47,12 @@ if ([int]$commitsAfterBeta -ne 0)
 {
     throw "Cannot promote '$tag' while main has $commitsAfterBeta commit(s) after it. Release or merge those changes as a beta first."
 }
+$betaSha = & git -C $ProjectRoot rev-parse "$tag^{commit}"
+$checkoutSha = & git -C $ProjectRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $betaSha -cne $checkoutSha)
+{
+    throw "Main must match the published beta tag '$tag' exactly."
+}
 
 $headers = @{
     Authorization          = "Bearer $env:GH_TOKEN"
@@ -55,9 +61,24 @@ $headers = @{
 }
 $api = "$($env:GITHUB_API_URL)/repos/$Repository"
 $release = Invoke-RestMethod -Uri "$api/releases/tags/$([uri]::EscapeDataString($tag))" -Headers $headers
-if (-not $release.prerelease -or $release.tag_name -cne $tag)
+if ($release.draft -or -not $release.published_at -or -not $release.prerelease -or $release.tag_name -cne $tag)
 {
     throw "GitHub release '$tag' is missing or is not marked as a prerelease."
+}
+$publishedBetas = @()
+$page = 1
+do
+{
+    $releases = @(Invoke-RestMethod -Uri "$api/releases?per_page=100&page=$page" -Headers $headers)
+    $publishedBetas += @($releases | Where-Object {
+        $_.prerelease -and -not $_.draft -and $_.published_at -and $_.tag_name -cmatch '^v\d+\.\d+\.\d+-beta[0-9]{3,}$'
+    })
+    $page++
+} while ($releases.Count -eq 100)
+$latestBeta = $publishedBetas | Sort-Object { [datetimeoffset]$_.published_at } -Descending | Select-Object -First 1
+if (-not $latestBeta -or $latestBeta.tag_name -cne $tag)
+{
+    throw "Only the latest published beta may be promoted; tracked beta is '$tag'."
 }
 
 $manifestPath = Join-Path $ProjectRoot '.release-please-manifest.json'
@@ -96,12 +117,7 @@ $stableSection = $stableHeading + $normalizedChangelog.Substring($heading.Index 
 $candidateChangelog = $normalizedChangelog.Substring(0, $heading.Index) +
     $stableSection + "`n`n" + $normalizedChangelog.Substring($heading.Index)
 
-$sectionEnd = $candidateChangelog.IndexOf("`n## ", $heading.Index + $stableSection.Length)
-if ($sectionEnd -lt 0)
-{
-    $sectionEnd = $candidateChangelog.Length
-}
-$releaseNotes = $candidateChangelog.Substring($heading.Index, $sectionEnd - $heading.Index).Trim()
+$releaseNotes = $stableSection.Trim()
 $body = @"
 :robot: I have created a release *beep* *boop*
 ---
@@ -112,12 +128,19 @@ $releaseNotes
 This PR was generated with [Release Please](https://github.com/googleapis/release-please). See [documentation](https://github.com/googleapis/release-please#release-please).
 "@
 $body = $body.Replace("`r`n", "`n")
-$null = & (Join-Path $PSScriptRoot 'Get-StableReleaseNotes.ps1') `
+$notes = & (Join-Path $PSScriptRoot 'Get-StableReleaseNotes.ps1') `
     -Changelog $candidateChangelog -PullRequestBody $body -Version $stableVersion
-$candidateChangelog = $candidateChangelog.Replace("`n", $newline)
-$body = $body.Replace("`n", $newline)
+$candidateChangelog = $notes.Changelog.Replace("`n", $newline)
+$body = $notes.PullRequestBody.Replace("`n", $newline)
 
-$pullRequests = Invoke-RestMethod -Uri "$api/pulls?state=open&base=main&per_page=100" -Headers $headers
+$pullRequests = @()
+$page = 1
+do
+{
+    $pagePullRequests = @(Invoke-RestMethod -Uri "$api/pulls?state=open&base=main&per_page=100&page=$page" -Headers $headers)
+    $pullRequests += $pagePullRequests
+    $page++
+} while ($pagePullRequests.Count -eq 100)
 $branch = 'release-please--branches--main'
 foreach ($pullRequest in $pullRequests)
 {
@@ -188,7 +211,7 @@ foreach ($entry in @(
         }
     }
     $payload = @{
-        message = "chore(main): prepare stable promotion $stableVersion"
+        message = "chore(main): prepare stable promotion $stableVersion`n`nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
         branch  = $branch
         content = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($entry.Content))
     }

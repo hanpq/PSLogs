@@ -52,7 +52,7 @@ Please the full documentation on the [docs site][pslogsdocs]
 
 ## Build and release
 
-See [BUILDING.md](BUILDING.md) for local build and test commands, dependency version pins, and the Release Please workflow.
+See [BUILDING.md](BUILDING.md) for local build and test commands, dependency version pins, and the manual **Prepare release** workflow.
 
 ## License
 
