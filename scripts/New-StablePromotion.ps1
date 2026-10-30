@@ -138,7 +138,7 @@ $pullRequests = @()
 $page = 1
 do
 {
-    $pagePullRequests = @(Invoke-RestMethod -Uri "$api/pulls?state=open&base=main    &per_page=100&page=$page" -Headers $headers | ForEach-Object { $_ })
+    $pagePullRequests = @(Invoke-RestMethod -Uri "$api/pulls?state=open&base=main&per_page=100&page=$page" -Headers $headers | ForEach-Object { $_ })
     $pullRequests += $pagePullRequests
     $page++
 } while ($pagePullRequests.Count -eq 100)
@@ -167,6 +167,27 @@ if ($LASTEXITCODE -ne 0 -or $checkoutSha -cne $baseSha)
 {
     throw 'Main changed since this workflow checked out the beta. Rerun the workflow before promoting.'
 }
+
+# One commit, like Release Please, so the squash merge message stays a single line.
+$baseCommit = Invoke-RestMethod -Uri "$api/git/commits/$baseSha" -Headers $headers
+$treePayload = @{
+    base_tree = $baseCommit.tree.sha
+    tree      = @(
+        @{ path = '.release-please-manifest.json'; mode = '100644'; type = 'blob'; content = $stableManifest }
+        @{ path = 'version.txt'; mode = '100644'; type = 'blob'; content = "$stableVersion`n" }
+        @{ path = 'CHANGELOG.md'; mode = '100644'; type = 'blob'; content = $candidateChangelog }
+    )
+} | ConvertTo-Json -Depth 3
+$tree = Invoke-RestMethod -Method Post -Uri "$api/git/trees" -Headers $headers `
+    -ContentType 'application/json' -Body ([System.Text.Encoding]::UTF8.GetBytes($treePayload))
+$commitPayload = @{
+    message = "chore(main): release $stableVersion"
+    tree    = $tree.sha
+    parents = @($baseSha)
+} | ConvertTo-Json
+$commit = Invoke-RestMethod -Method Post -Uri "$api/git/commits" -Headers $headers `
+    -ContentType 'application/json' -Body ([System.Text.Encoding]::UTF8.GetBytes($commitPayload))
+
 try
 {
     $null = Invoke-RestMethod -Uri $branchReference -Headers $headers
@@ -182,47 +203,15 @@ catch
 }
 if ($branchExists)
 {
-    $referencePayload = @{ sha = $baseSha; force = $true } | ConvertTo-Json
+    $referencePayload = @{ sha = $commit.sha; force = $true } | ConvertTo-Json
     Invoke-RestMethod -Method Patch -Uri "$api/git/refs/heads/$branch" -Headers $headers `
         -ContentType 'application/json' -Body $referencePayload | Out-Null
 }
 else
 {
-    $referencePayload = @{ ref = "refs/heads/$branch"; sha = $baseSha } | ConvertTo-Json
+    $referencePayload = @{ ref = "refs/heads/$branch"; sha = $commit.sha } | ConvertTo-Json
     Invoke-RestMethod -Method Post -Uri "$api/git/refs" -Headers $headers `
         -ContentType 'application/json' -Body $referencePayload | Out-Null
-}
-
-foreach ($entry in @(
-        @{ Path = '.release-please-manifest.json'; Content = $stableManifest },
-        @{ Path = 'version.txt'; Content = "$stableVersion`n" },
-        @{ Path = 'CHANGELOG.md'; Content = $candidateChangelog }
-    ))
-{
-    $file = $null
-    try
-    {
-        $file = Invoke-RestMethod -Uri "$api/contents/$($entry.Path)?ref=$baseSha" -Headers $headers
-    }
-    catch
-    {
-        if ($entry.Path -ne 'version.txt' -or [int]$_.Exception.Response.StatusCode -ne 404)
-        {
-            throw
-        }
-    }
-    $payload = @{
-        message = "chore(main): prepare stable promotion $stableVersion`n`nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-        branch  = $branch
-        content = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($entry.Content))
-    }
-    if ($file)
-    {
-        $payload.sha = $file.sha
-    }
-    $payload = $payload | ConvertTo-Json
-    Invoke-RestMethod -Method Put -Uri "$api/contents/$($entry.Path)" -Headers $headers `
-        -ContentType 'application/json' -Body ([System.Text.Encoding]::UTF8.GetBytes($payload)) | Out-Null
 }
 
 $pullRequestPayload = @{

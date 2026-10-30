@@ -21,6 +21,15 @@ BeforeAll {
         })
         return $exception
     }
+
+    function Get-PostedJson
+    {
+        param($Requests, [string]$UriPattern)
+
+        $request = @($Requests | Where-Object { $_.Method -eq 'Post' -and $_.Uri -like $UriPattern })
+        $request.Count | Should -Be 1
+        [System.Text.Encoding]::UTF8.GetString([byte[]]$request[0].Body) | ConvertFrom-Json
+    }
 }
 
 Describe 'Stable promotion PR creation' {
@@ -121,7 +130,19 @@ Describe 'Stable promotion PR creation' {
             }
             if ($Uri -like '*/contents/*')
             {
-                return @{ sha = 'file-sha' }
+                throw 'Stable promotion must not use the per-file contents API.'
+            }
+            if ($Uri -like '*/git/commits/*' -and -not $Method)
+            {
+                return @{ sha = $apiState.MainSha; tree = @{ sha = 'base-tree-sha' } }
+            }
+            if ($Uri -like '*/git/trees' -and $Method -eq 'Post')
+            {
+                return @{ sha = 'new-tree-sha' }
+            }
+            if ($Uri -like '*/git/commits' -and $Method -eq 'Post')
+            {
+                return @{ sha = 'new-commit-sha' }
             }
             if ($Uri -like '*/pulls' -and $Method -eq 'Post')
             {
@@ -152,33 +173,26 @@ Describe 'Stable promotion PR creation' {
         $pullRequestBody.title | Should -Be 'chore(main): release 2.0.0'
         $pullRequestBody.head | Should -Be 'release-please--branches--main'
         $pullRequestBody.body | Should -Match '## \[2\.0\.0\]'
+        $apiState.Requests.Uri |
+            Should -Contain 'https://api.github.test/repos/example/module/pulls?state=open&base=main&per_page=100&page=1'
 
-        $contentWrites = @($apiState.Requests | Where-Object { $_.Uri -like '*/contents/*' -and $_.Method -eq 'Put' })
-        $contentWrites.Count | Should -Be 3
-        $manifestPayload = [System.Text.Encoding]::UTF8.GetString([byte[]]$contentWrites[0].Body) | ConvertFrom-Json
-        [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($manifestPayload.content)) |
-            Should -Match '2\.0\.0'
-        $versionPayload = [System.Text.Encoding]::UTF8.GetString([byte[]]$contentWrites[1].Body) | ConvertFrom-Json
-        [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($versionPayload.content)) |
-            Should -Be "2.0.0`n"
-        $changelogPayload = [System.Text.Encoding]::UTF8.GetString([byte[]]$contentWrites[2].Body) | ConvertFrom-Json
-        $updatedChangelog = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($changelogPayload.content))
+        $tree = Get-PostedJson -Requests $apiState.Requests -UriPattern '*/git/trees'
+        $tree.base_tree | Should -Be 'base-tree-sha'
+        $tree.tree.path | Should -Be @('.release-please-manifest.json', 'version.txt', 'CHANGELOG.md')
+        ($tree.tree | Where-Object path -EQ '.release-please-manifest.json').content | Should -Match '2\.0\.0'
+        ($tree.tree | Where-Object path -EQ 'version.txt').content | Should -Be "2.0.0`n"
+        $updatedChangelog = ($tree.tree | Where-Object path -EQ 'CHANGELOG.md').content
         $updatedChangelog | Should -Match '## \[2\.0\.0\]'
         $updatedChangelog | Should -Match '## \[2\.0\.0-beta001\]'
     }
 
-    It 'creates version.txt without a sha when it is absent from the beta' {
-        Mock Invoke-RestMethod {
-            throw (New-TestHttpException -Message 'Version file not found' -StatusCode NotFound)
-        } -ParameterFilter { -not $Method -and $Uri -like '*/contents/version.txt?*' }
-
+    It 'writes the promotion as a single Release Please style commit on top of main' {
         & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
 
-        $write = $apiState.Requests | Where-Object { $_.Method -eq 'Put' -and $_.Uri -like '*/contents/version.txt' }
-        $payload = [System.Text.Encoding]::UTF8.GetString([byte[]]$write.Body) | ConvertFrom-Json
-        $payload.PSObject.Properties.Name | Should -Not -Contain 'sha'
-        [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload.content)) |
-            Should -Be "2.0.0`n"
+        $commit = Get-PostedJson -Requests $apiState.Requests -UriPattern '*/git/commits'
+        $commit.message | Should -BeExactly 'chore(main): release 2.0.0'
+        $commit.tree | Should -Be 'new-tree-sha'
+        @($commit.parents) | Should -Be @($apiState.MainSha)
     }
 
     It 'rolls up all beta notes before writing the promotion, preserving beta history' {
@@ -196,9 +210,8 @@ Describe 'Stable promotion PR creation' {
         $changelog = $changelog.Replace('## [1.0.0]', "$olderBeta`n## [1.0.0]")
         Set-Content $changelogPath $changelog
         & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot
-        $write = $apiState.Requests | Where-Object { $_.Method -eq 'Put' -and $_.Uri -like '*/contents/CHANGELOG.md' }
-        $payload = [System.Text.Encoding]::UTF8.GetString([byte[]]$write.Body) | ConvertFrom-Json
-        $result = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload.content))
+        $tree = Get-PostedJson -Requests $apiState.Requests -UriPattern '*/git/trees'
+        $result = ($tree.tree | Where-Object path -EQ 'CHANGELOG.md').content
         $stableSection = ($result -split '(?m)^## \[2.0.0-beta001\]')[0]
         $stableSection | Should -Match 'earlier beta fix'
         $stableSection | Should -Match 'beta feature'
@@ -229,26 +242,6 @@ Describe 'Stable promotion PR creation' {
         @($apiState.Requests | Where-Object Method -in @('Put', 'Patch', 'Post')).Count | Should -Be 0
     }
 
-    It 'does not ignore missing required release files' {
-        Mock Invoke-RestMethod {
-            throw (New-TestHttpException -Message 'Manifest not found' -StatusCode NotFound)
-        } -ParameterFilter { -not $Method -and $Uri -like '*/contents/.release-please-manifest.json?*' }
-
-        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
-            Should -Throw '*Manifest not found*'
-        @($apiState.Requests | Where-Object { $_.Method -eq 'Put' -and $_.Uri -like '*/contents/*' }).Count |
-            Should -Be 0
-    }
-
-    It 'does not treat a version file permission error as a missing file' {
-        Mock Invoke-RestMethod {
-            throw (New-TestHttpException -Message 'Version file forbidden' -StatusCode Forbidden)
-        } -ParameterFilter { -not $Method -and $Uri -like '*/contents/version.txt?*' }
-
-        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
-            Should -Throw '*Version file forbidden*'
-    }
-
     It 'does not create a promotion while commits remain after the beta' {
         $gitState.CommitsAfterBeta = 1
 
@@ -264,7 +257,7 @@ Describe 'Stable promotion PR creation' {
             $_.Method -eq 'Patch' -and $_.Uri -like '*/git/refs/heads/*'
         })
         $updates.Count | Should -Be 1
-        ($updates[0].Body | ConvertFrom-Json).sha | Should -Be $apiState.MainSha
+        ($updates[0].Body | ConvertFrom-Json).sha | Should -Be 'new-commit-sha'
         @($apiState.Requests | Where-Object { $_.Method -eq 'Post' -and $_.Uri -like '*/git/refs' }).Count |
             Should -Be 0
     }
