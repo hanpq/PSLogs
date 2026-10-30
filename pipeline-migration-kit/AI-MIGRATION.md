@@ -25,7 +25,7 @@ Read this whole document before changing anything. Follow the steps in order.
 
 Understand this before migrating, so you can judge what the old files did and whether anything is lost.
 
-- `build.ps1` replaces Sampler. Tasks: `Verify` (default: build + all tests), `Build`, `Test`, `Package`, `Clean`, `InstallDependencies`. `-TestSuite All|Module|Infrastructure` selects `tests/Unit` + `tests/QA` (Module, with code coverage) or `tests/Build` (Infrastructure). Dependencies are pinned in `RequiredModules.psd1` and saved to `output/RequiredModules`.
+- `build.ps1` replaces Sampler. Tasks: `Verify` (default: build + all tests), `Build`, `Test`, `Package`, `Clean`, `InstallDependencies`. `-TestSuite All|Module|Infrastructure` selects `tests/Unit` + `tests/QA` (Module, with code coverage) or `tests/Build` (Infrastructure). Dependencies are pinned in `RequiredModules.psd1` and saved to `output/RequiredModules`. Coverage is measured on the built `.psm1` and mapped back to `source/Public` and `source/Private` by `scripts/ConvertTo-SourceCoverage.ps1`; the build fails if no lines map there (for example a module with only `Classes`), so report that instead of lowering the target.
 - The module is built with ModuleBuilder from the single manifest `source/<ModuleName>.psd1` into `output/<ModuleName>/<Version>/`. `source/prefix.ps1`, `source/suffix.ps1` and the `source/en-US` and `source/include` folders are used when they exist.
 - The module name comes from the manifest file name. The version comes from `.release-please-manifest.json`, not from the source manifest and not from Git history (GitVersion is gone).
 - `.github/workflows/ci.yml` runs on pushes and pull requests to `main`. It never releases.

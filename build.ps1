@@ -281,6 +281,7 @@ function Invoke-ModuleTests
     Write-Host 'Preparing Pester and PSScriptAnalyzer' -ForegroundColor Cyan
     Import-BuildModule -Name PSScriptAnalyzer
     Import-BuildModule -Name Pester
+    Import-BuildModule -Name ModuleBuilder
     $env:PSModulePath = $OutputDirectory + [System.IO.Path]::PathSeparator + $env:PSModulePath
 
     New-Item -ItemType Directory -Path $TestResultsDirectory -Force | Out-Null
@@ -297,11 +298,9 @@ function Invoke-ModuleTests
     $configuration.TestResult.Enabled = $true
     $configuration.TestResult.OutputFormat = 'NUnitXml'
     $configuration.TestResult.OutputPath = Join-Path $TestResultsDirectory "$ModuleName.Tests.xml"
-    $coveragePaths = @(@('Private', 'Public') |
-            Where-Object { Test-Path -LiteralPath (Join-Path $PSScriptRoot "source\$_") } |
-            ForEach-Object { Join-Path $PSScriptRoot "source\$_\*.ps1" })
-    $configuration.CodeCoverage.Enabled = $TestSuite -ne 'Infrastructure' -and $coveragePaths.Count -gt 0
-    $configuration.CodeCoverage.Path = $coveragePaths
+    $builtModulePath = Join-Path (Join-Path (Join-Path $OutputDirectory $ModuleName) $ModuleVersion.Split('-')[0]) "$ModuleName.psm1"
+    $configuration.CodeCoverage.Enabled = $TestSuite -ne 'Infrastructure'
+    $configuration.CodeCoverage.Path = @($builtModulePath)
     $configuration.CodeCoverage.OutputFormat = 'JaCoCo'
     $configuration.CodeCoverage.OutputPath = Join-Path $TestResultsDirectory 'JaCoCo_coverage.xml'
     $configuration.CodeCoverage.CoveragePercentTarget = 1
@@ -312,6 +311,20 @@ function Invoke-ModuleTests
     if ($result.Result -ne 'Passed')
     {
         throw "Pester did not pass (result: $($result.Result); failed tests: $($result.FailedCount); failed containers: $($result.FailedContainersCount)). See the Pester output above for details."
+    }
+
+    if ($configuration.CodeCoverage.Enabled.Value)
+    {
+        & (Join-Path $PSScriptRoot 'scripts\ConvertTo-SourceCoverage.ps1') `
+            -ReportPath $configuration.CodeCoverage.OutputPath.Value `
+            -BuiltModulePath $builtModulePath `
+            -SourceDirectory (Join-Path $PSScriptRoot 'source')
+
+        if ($result.CodeCoverage.CommandsAnalyzedCount -eq 0 -or
+            $result.CodeCoverage.CoveragePercent -lt $configuration.CodeCoverage.CoveragePercentTarget.Value)
+        {
+            throw "Code coverage is below the required target: $($result.CodeCoverage.CoveragePercent)% / $($configuration.CodeCoverage.CoveragePercentTarget.Value)%."
+        }
     }
 
     Write-Host "Pester tests passed. Test results and coverage reports: $TestResultsDirectory" -ForegroundColor Green

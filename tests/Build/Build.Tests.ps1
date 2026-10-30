@@ -14,6 +14,7 @@ BeforeAll {
 
     $DependencyManifest = Join-Path $projectRoot 'RequiredModules.psd1'
     $RequiredModulesDirectory = Join-Path $projectRoot 'output\RequiredModules'
+    Import-Module (Join-Path $RequiredModulesDirectory 'ModuleBuilder\3.1.8\ModuleBuilder.psd1') -Force
     $OutputDirectory = Join-Path $TestDrive 'output'
     $TestResultsDirectory = Join-Path $OutputDirectory 'testResults'
     $ModuleName = 'ExampleModule'
@@ -259,13 +260,34 @@ Describe 'Pinned build module imports' {
 Describe 'Build test runner' {
     BeforeEach {
         $originalModulePath = $env:PSModulePath
+        $OutputDirectory = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        $TestResultsDirectory = Join-Path $OutputDirectory 'testResults'
+        $moduleDirectory = Join-Path $OutputDirectory 'ExampleModule\1.2.3'
+        New-Item -ItemType Directory -Path $moduleDirectory -Force | Out-Null
+        # The runner converts against the real source folder, so map to any existing function file.
+        $mappedSourceFile = Get-ChildItem -Path (Join-Path $projectRoot 'source\Public'), (Join-Path $projectRoot 'source\Private') `
+            -Filter '*.ps1' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        $mappedSourcePath = './{0}/{1}' -f $mappedSourceFile.Directory.Name, $mappedSourceFile.Name
+        Set-Content -LiteralPath (Join-Path $moduleDirectory 'ExampleModule.psm1') -Value @(
+            "#Region '$mappedSourcePath' -1", '', 'Write-Output 1'
+        )
         Mock Write-Host {}
         Mock Import-BuildModule {}
         Mock Invoke-Pester {
+            if ($Configuration.CodeCoverage.Enabled.Value)
+            {
+                Set-Content -LiteralPath $Configuration.CodeCoverage.OutputPath.Value -Value @'
+<report name="ExampleModule"><package name="output"><sourcefile name="ExampleModule.psm1"><line nr="3" mi="0" ci="1" mb="0" cb="0"/></sourcefile></package></report>
+'@
+            }
             [pscustomobject]@{
                 Result                = 'Passed'
                 FailedCount           = 0
                 FailedContainersCount = 0
+                CodeCoverage          = [pscustomobject]@{
+                    CommandsAnalyzedCount = 1
+                    CoveragePercent       = 100
+                }
             }
         }
     }
@@ -279,6 +301,7 @@ Describe 'Build test runner' {
 
         Should -Invoke Import-BuildModule -Times 1 -Exactly -ParameterFilter { $Name -eq 'PSScriptAnalyzer' }
         Should -Invoke Import-BuildModule -Times 1 -Exactly -ParameterFilter { $Name -eq 'Pester' }
+        Should -Invoke Import-BuildModule -Times 1 -Exactly -ParameterFilter { $Name -eq 'ModuleBuilder' }
         Should -Invoke Invoke-Pester -Times 1 -Exactly -ParameterFilter {
             $Configuration.TestResult.OutputPath.Value -eq (Join-Path $TestResultsDirectory 'ExampleModule.Tests.xml')
         }
@@ -309,8 +332,47 @@ Describe 'Build test runner' {
             $expected = @($Directories | ForEach-Object { Join-Path $projectRoot $_ })
             @($Configuration.Run.Path.Value).Count -eq $expected.Count -and
             @(Compare-Object @($Configuration.Run.Path.Value) $expected).Count -eq 0 -and
-            $Configuration.CodeCoverage.Enabled.Value -eq $Coverage
+            $Configuration.CodeCoverage.Enabled.Value -eq $Coverage -and
+            $Configuration.CodeCoverage.Path.Value[0] -eq (Join-Path $OutputDirectory 'ExampleModule\1.2.3\ExampleModule.psm1')
         }
+    }
+
+    It 'fails when coverage is below target or no commands were analyzed' -ForEach @(
+        @{ Analyzed = 100; Percent = 0 }
+        @{ Analyzed = 100; Percent = 0.5 }
+        @{ Analyzed = 0; Percent = 100 }
+    ) {
+        Mock Invoke-Pester {
+            Set-Content -LiteralPath $Configuration.CodeCoverage.OutputPath.Value -Value @'
+<report name="ExampleModule"><package name="output"><sourcefile name="ExampleModule.psm1"><line nr="3" mi="1" ci="0" mb="0" cb="0"/></sourcefile></package></report>
+'@
+            [pscustomobject]@{
+                Result       = 'Passed'
+                CodeCoverage = [pscustomobject]@{
+                    CommandsAnalyzedCount = $Analyzed
+                    CoveragePercent       = $Percent
+                }
+            }
+        }
+
+        { Invoke-ModuleTests -ModuleVersion '1.2.3' -TestSuite Module } |
+            Should -Throw '*Code coverage is below the required target*'
+
+        Should -Invoke Write-Host -Times 0 -Exactly -ParameterFilter { $Object -like 'Pester tests passed.*' }
+    }
+
+    It 'accepts coverage exactly at the required target' {
+        Mock Invoke-Pester {
+            Set-Content -LiteralPath $Configuration.CodeCoverage.OutputPath.Value -Value @'
+<report name="ExampleModule"><package name="output"><sourcefile name="ExampleModule.psm1"><line nr="3" mi="99" ci="1" mb="0" cb="0"/></sourcefile></package></report>
+'@
+            [pscustomobject]@{
+                Result       = 'Passed'
+                CodeCoverage = [pscustomobject]@{ CommandsAnalyzedCount = 100; CoveragePercent = 1 }
+            }
+        }
+
+        { Invoke-ModuleTests -ModuleVersion '1.2.3' -TestSuite Module } | Should -Not -Throw
     }
 
     It 'fails when discovery fails without any failed tests' {
