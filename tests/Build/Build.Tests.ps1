@@ -105,6 +105,8 @@ Describe 'Module packaging' {
         @{ Parts = @(); ExpectedCopyPaths = $null; ExpectedPrefix = $null; ExpectedSuffix = $null }
         @{ Parts = @('en-US', 'prefix.ps1'); ExpectedCopyPaths = @('en-US'); ExpectedPrefix = 'prefix.ps1'; ExpectedSuffix = $null }
         @{ Parts = @('en-US', 'include', 'prefix.ps1', 'suffix.ps1'); ExpectedCopyPaths = @('en-US', 'include'); ExpectedPrefix = 'prefix.ps1'; ExpectedSuffix = 'suffix.ps1' }
+        @{ Parts = @('format'); ExpectedCopyPaths = @('format'); ExpectedPrefix = $null; ExpectedSuffix = $null }
+        @{ Parts = @('en-US', 'include', 'format'); ExpectedCopyPaths = @('en-US', 'include', 'format'); ExpectedPrefix = $null; ExpectedSuffix = $null }
     ) {
         function Build-Module
         {
@@ -135,6 +137,34 @@ Describe 'Module packaging' {
 
         Should -Invoke Build-Module -Times 1 -Exactly -ParameterFilter {
             "$CopyPaths" -eq "$ExpectedCopyPaths" -and "$Prefix" -eq "$ExpectedPrefix" -and "$Suffix" -eq "$ExpectedSuffix"
+        }
+    }
+
+    It 'includes optional format assets in the built module and release archive' {
+        $fixture = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        $sourceDirectory = Join-Path $fixture 'source'
+        $formatDirectory = Join-Path $sourceDirectory 'format'
+        New-Item -ItemType Directory -Path $formatDirectory -Force | Out-Null
+        $SourceManifest = Join-Path $sourceDirectory 'ExampleModule.psd1'
+        Set-Content -LiteralPath $SourceManifest -Value "@{ RootModule = 'ExampleModule.psm1'; ModuleVersion = '1.2.3'; GUID = 'e3dd1e6e-fab6-481c-a405-d02d26ae9ca7'; FunctionsToExport = @(); PrivateData = @{ PSData = @{ ReleaseNotes = '' } } }"
+        $formatFile = 'ExampleModule.Format.ps1xml'
+        Set-Content -LiteralPath (Join-Path $formatDirectory $formatFile) -Value '<Configuration/>'
+        $OutputDirectory = Join-Path $fixture 'output'
+        $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
+        Mock Import-BuildModule { }
+
+        Build-ProjectModule -ModuleVersion '1.2.3' | Out-Null
+        Test-Path -LiteralPath (Join-Path $BuiltModuleDirectory "1.2.3\format\$formatFile") | Should -BeTrue
+
+        New-ModulePackage -ModuleVersion '1.2.3'
+        $archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $OutputDirectory 'ExampleModule.1.2.3.zip'))
+        try
+        {
+            $archive.Entries.FullName | Should -Contain "format/$formatFile"
+        }
+        finally
+        {
+            $archive.Dispose()
         }
     }
 

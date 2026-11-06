@@ -16,6 +16,8 @@ The default `Verify` task builds the module from `source/` and runs tests from `
 ./build.ps1 -Task Package
 ```
 
+Optional `source/en-US`, `source/include` and `source/format` directories are copied into the built module when present. Keep source directory names lowercase except for canonical PowerShell culture directories such as `en-US`; the migration kit explains how to rename legacy folders without losing Git history.
+
 Import the generated module from `output/PSLogs/<version>/` to try it locally. Make changes in `source/`, not generated output under `output/`.
 
 Local tests run all suites by default. Use `-Task Test -TestSuite Module` for unit/QA tests or `-Task Test -TestSuite Infrastructure` for build/release tests. CI runs module tests with coverage across all supported platforms, and infrastructure tests once on Linux PowerShell 7 without coverage. Release publishing runs the module suite.

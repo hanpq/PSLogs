@@ -15,7 +15,7 @@ Read this whole document before changing anything. Follow the steps in order.
 ## Ground rules
 
 - Work on a new branch, for example `build/replace-pipeline`. Never push, open pull requests, create tags, publish modules or change GitHub settings unless the maintainer explicitly asks.
-- Do not change module behavior. Only touch files under `source/` where this guide says so (the module manifest).
+- Do not change module behavior. Only touch files under `source/` where this guide says so (the module manifest and directory casing).
 - Never commit secrets, tokens or credentials.
 - The pipeline files in `copy/` are tested in PSLogs. Do not "improve" them. The only allowed changes are the module profile edits in [Step 5b](#step-5b-apply-the-module-profile). If a file does not work for this module for any other reason, stop and report why instead of rewriting it.
 - When something does not fit this guide (see [Stop conditions](#stop-conditions)), stop and ask the maintainer.
@@ -25,8 +25,8 @@ Read this whole document before changing anything. Follow the steps in order.
 
 Understand this before migrating, so you can judge what the old files did and whether anything is lost.
 
-- `build.ps1` replaces Sampler. Tasks: `Verify` (default: build + all tests), `Build`, `Test`, `Package`, `Clean`, `InstallDependencies`. `-TestSuite All|Module|Infrastructure` selects `tests/Unit` + `tests/QA` (Module, with code coverage) or `tests/Build` (Infrastructure). Dependencies are pinned in `RequiredModules.psd1` and saved to `output/RequiredModules`. Coverage is measured on the built `.psm1` and mapped back to `source/Public` and `source/Private` by `scripts/ConvertTo-SourceCoverage.ps1`; the build fails if no lines map there (for example a module with only `Classes`), so report that instead of lowering the target.
-- The module is built with ModuleBuilder from the single manifest `source/<ModuleName>.psd1` into `output/<ModuleName>/<Version>/`. `source/prefix.ps1`, `source/suffix.ps1` and the `source/en-US` and `source/include` folders are used when they exist.
+- `build.ps1` replaces Sampler. Tasks: `Verify` (default: build + all tests), `Build`, `Test`, `Package`, `Clean`, `InstallDependencies`. `-TestSuite All|Module|Infrastructure` selects `tests/Unit` + `tests/QA` (Module, with code coverage) or `tests/Build` (Infrastructure). Dependencies are pinned in `RequiredModules.psd1` and saved to `output/RequiredModules`. Coverage is measured on the built `.psm1` and mapped back to `source/public` and `source/private` by `scripts/ConvertTo-SourceCoverage.ps1`; the build fails if no lines map there (for example a module with only `classes`), so report that instead of lowering the target.
+- The module is built with ModuleBuilder from the single manifest `source/<ModuleName>.psd1` into `output/<ModuleName>/<Version>/`. `source/prefix.ps1`, `source/suffix.ps1` and the `source/en-US`, `source/include` and `source/format` folders are copied when they exist. The singular `format` folder holds formatting assets such as `.ps1xml` files.
 - The module name comes from the manifest file name. The version comes from `.release-please-manifest.json`, not from the source manifest and not from Git history (GitVersion is gone).
 - `.github/workflows/ci.yml` runs on pushes and pull requests to `main`, except pushes that only change release metadata (merged release PRs). It never releases.
 - `.github/workflows/release-please.yml` ("Prepare release") only runs when the maintainer starts it manually (beta or stable). It opens a release PR that updates `.release-please-manifest.json`, `version.txt` and `CHANGELOG.md`. Merging that PR creates the tag and GitHub release.
@@ -47,7 +47,7 @@ Collect the following facts. You need them later and must include them in your f
 1. **Module name.** `source/` must contain exactly one `*.psd1`. Its base name is the module name.
 2. **Repository slug** (`owner/name`) from `git remote get-url origin`.
 3. **Current released version.** Use the newest `v<Major>.<Minor>.<Patch>` Git tag (`git tag --list 'v*' --sort=-v:refname`) and cross-check it with the newest released entry in `CHANGELOG.md` and, if the module is on the PowerShell Gallery, `Find-Module <ModuleName>`. For modules that are only published to ProGet, ask the maintainer to confirm the version in ProGet instead. They should agree; if they do not, stop and ask. Ignore prerelease tags when choosing the version, unless the newest release is a prerelease; then ask the maintainer.
-4. **Old build settings** in `build.yaml`: `CopyPaths`, `Prefix`, `Suffix`, `NestedModule`, `Encoding`, the `BuildWorkflow` tasks, the `Pester` section (`CodeCoverage`, `ExcludeFromCodeCoverage`, test paths and tags) and `GitHubConfig`. The PSLogs equivalent was `CopyPaths: [en-US, include]`, `Prefix: prefix.ps1`, `Suffix: suffix.ps1`, an empty `NestedModule`, coverage target 1 and `ExcludeFromCodeCoverage: include`.
+4. **Old build settings** in `build.yaml`: `CopyPaths`, `Prefix`, `Suffix`, `NestedModule`, `Encoding`, the `BuildWorkflow` tasks, the `Pester` section (`CodeCoverage`, `ExcludeFromCodeCoverage`, test paths and tags) and `GitHubConfig`. The new build supports optional `CopyPaths: [en-US, include, format]` (including legacy `Format` after renaming), `Prefix: prefix.ps1`, `Suffix: suffix.ps1`, an empty `NestedModule`, coverage target 1 and `ExcludeFromCodeCoverage: include`. Check that every legacy copy path's assets are preserved.
 5. **Custom build tasks** in `.build/*.ps1` and any other task files. PSLogs had `Publish.PSGallery`, `Publish.Proget`, `Publish.Release.To.GitHub`, `Publish.Create.ChangeLog.GitHub.PR` and `Publish.Create.Docs.GitHub.PR`; all of them are covered by the new workflows. Anything else (code signing, extra artifacts, external services) is not covered.
 6. **Old workflows** in `.github/workflows/` and every `secrets.*` they reference.
 7. **Dependencies** in the old `RequiredModules.psd1`. Note entries that are not build tooling (Sampler, Sampler.GitHubTasks, InvokeBuild, Pester, PSScriptAnalyzer, Plaster, ModuleBuilder, ChangelogManagement, Configuration, Encoding, PlatyPS, Alt3.Docusaurus.Powershell, PowerShellGet, PackageManagement, Microsoft.PowerShell.PSResourceGet, MarkdownLinkCheck, DscResource.*).
@@ -60,7 +60,7 @@ Collect the following facts. You need them later and must include them in your f
 Stop and ask the maintainer before continuing if any of these is true:
 
 - `source/` contains more than one `*.psd1`, or the module is not built from `source/` with ModuleBuilder.
-- `build.yaml` configures `NestedModule` entries, `CopyPaths` other than `en-US` and `include`, a prefix or suffix file other than `prefix.ps1`/`suffix.ps1`, or an `Encoding` other than UTF8.
+- `build.yaml` configures `NestedModule` entries, `CopyPaths` whose names do not match `en-US`, `include` or singular `format` (ignoring case), a prefix or suffix file other than `prefix.ps1`/`suffix.ps1`, or an `Encoding` other than UTF8. Stop if a listed copy path is missing or its contents cannot be preserved.
 - A custom build task, workflow or test does something the new pipeline does not cover (for example code signing with the `PFX_*` secrets, DSC resources, extra packages).
 - The old `RequiredModules.psd1` contains a module the tests need at runtime that is not build tooling.
 - Release tags do not follow `v<Major>.<Minor>.<Patch>`, or the current version is unclear.
@@ -87,6 +87,8 @@ Copy every file from `copy/` to the same relative path in the repository root, o
 `RequiredModules.psd1` is replaced by the kit version. If step 2 found a runtime dependency that tests need, you should already have stopped.
 
 ## Step 5: Adapt the module-specific files
+
+Normalize directory names recursively under `source/` to lowercase before adapting files. Preserve canonical PowerShell culture names such as `en-US` (and correct mis-cased culture names such as `en-us`): PowerShell uses them to find localized help. Rename legacy `Public`, `Private`, `Include`, `Format` (singular) and any other non-culture directories, including nested ones. On case-insensitive filesystems, use two `git mv` commands per tracked directory via a temporary name (for example `git mv source\Format source\format-tmp` followed by `git mv source\format-tmp source\format`); for untracked directories use a corresponding two-step filesystem move. Check for case-colliding destinations before moving and stop rather than merging or overwriting them. Update path references in scripts, tests, manifests, documentation and configuration to the exact new casing, including source mappings and packaging paths. Do not rename files or change module behavior.
 
 For each file in `adapt/`, start from the kit version, then apply the changes below. "PSLogs-specific" means content about logging, runspaces or PSLogs features.
 
@@ -159,6 +161,20 @@ Use the current released version `X.Y.Z` from step 2.
 
 ## Step 7: Validate
 
+Check that every directory under `source/` is lowercase except canonical culture directories (for example `en-US`). Run this PowerShell check and resolve every reported path before continuing:
+
+```powershell
+$cultureNames = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::AllCultures).Name
+$invalidDirectories = @(Get-ChildItem -LiteralPath source -Directory -Recurse | Where-Object {
+    if ($_.Name -cin $cultureNames) { $false }
+    elseif ($_.Name -in $cultureNames) { $true }
+    else { $_.Name -cne $_.Name.ToLowerInvariant() }
+})
+if ($invalidDirectories.Count) {
+    throw "Source directories must be lowercase or canonically named cultures: $($invalidDirectories.FullName -join ', ')"
+}
+```
+
 Run from the repository root:
 
 ```powershell
@@ -191,6 +207,7 @@ Then:
    - Module name, repository slug and the release version you recorded.
    - The module profile: publish targets, repository visibility, supported CI targets and the edits from step 5b.
    - Files deleted, copied, adapted and created.
+   - Source directories renamed, and confirmation that formatting assets (if present) are in the built module and package.
    - Anything from the old pipeline that is not covered by the new one.
    - Old and new code coverage target, and module-specific PR template items that were dropped.
    - Test results, including failures unrelated to the migration.
@@ -201,7 +218,7 @@ Then:
 
 The repository already uses this pipeline and gets a newer kit.
 
-1. Compare `copy/` with the repository and overwrite the repository files with the kit versions. List what changed. Then re-apply the edits listed under **Pipeline customizations** in the repository's `BUILDING.md` (see step 5b), including deleting files such as `scripts/Update-Docs.ps1` again. If a listed edit no longer fits the new kit files, stop and ask.
+1. Compare `copy/` with the repository and overwrite the repository files with the kit versions. List what changed. Normalize `source/` directories as described in step 5, updating path references. Then re-apply the edits listed under **Pipeline customizations** in the repository's `BUILDING.md` (see step 5b), including deleting files such as `scripts/Update-Docs.ps1` again. If a listed edit no longer fits the new kit files, stop and ask.
 2. For each file in `adapt/`, compare the kit version with the repository version and port only pipeline-relevant changes. Keep module-specific content.
 3. Copy new files that the kit lists but the repository lacks, except files that **Pipeline customizations** says were deleted. Delete repository files that a previous kit listed but the new kit no longer contains, such as removed scripts under `scripts/` or tests under `tests/Build/`. Check that nothing still references them.
 4. Do not touch `.release-please-manifest.json`, `version.txt`, `CHANGELOG.md` or the module version.
