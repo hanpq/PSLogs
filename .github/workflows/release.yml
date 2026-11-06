@@ -63,6 +63,8 @@ jobs:
           }
           $version = $env:MODULE_VERSION
           $modulePath = Join-Path $PWD $env:MODULE_PATH
+          $modulePathRoot = Join-Path $PWD 'output/RequiredModules'
+          $env:PSModulePath = $modulePathRoot + [IO.Path]::PathSeparator + $env:PSModulePath
           try {
             Publish-Module -Path $modulePath -NuGetApiKey $env:GALLERYAPITOKEN -Repository PSGallery -ErrorAction Stop
           }

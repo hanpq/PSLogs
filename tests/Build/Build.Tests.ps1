@@ -5,10 +5,10 @@ BeforeAll {
     foreach ($functionName in @('Import-BuildModule', 'Build-ProjectModule', 'Invoke-ModuleTests', 'New-ModulePackage'))
     {
         $definition = $ast.Find({
-            param($node)
-            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
                 $node.Name -eq $functionName
-        }, $true)
+            }, $true)
         Set-Item -Path "Function:\$functionName" -Value $definition.Body.GetScriptBlock()
     }
 
@@ -117,7 +117,14 @@ Describe 'Module packaging' {
         Set-Content -LiteralPath $SourceManifest -Value "@{ ModuleVersion = '1.2.3' }"
         foreach ($part in $Parts)
         {
-            $type = if ($part -like '*.ps1') { 'File' } else { 'Directory' }
+            $type = if ($part -like '*.ps1')
+            {
+                'File' 
+            }
+            else
+            {
+                'Directory' 
+            }
             New-Item -ItemType $type -Path (Join-Path $sourceDirectory $part) -Force | Out-Null
         }
         $BuiltModuleDirectory = Join-Path $OutputDirectory $ModuleName
@@ -239,7 +246,7 @@ Describe 'Release publication guards' {
         Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = '' } } }"
 
         { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' `
-            -RefTag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
+                -RefTag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
             Should -Throw '*does not match tracked version*'
     }
 }
@@ -265,7 +272,7 @@ Describe 'Build test runner' {
         $moduleDirectory = Join-Path $OutputDirectory 'ExampleModule\1.2.3'
         New-Item -ItemType Directory -Path $moduleDirectory -Force | Out-Null
         # The runner converts against the real source folder, so map to any existing function file.
-        $mappedSourceFile = Get-ChildItem -Path (Join-Path $projectRoot 'source\Public'), (Join-Path $projectRoot 'source\Private') `
+        $mappedSourceFile = Get-ChildItem -Path (Join-Path $projectRoot 'source\public'), (Join-Path $projectRoot 'source\private') `
             -Filter '*.ps1' -File -ErrorAction SilentlyContinue | Select-Object -First 1
         $mappedSourcePath = './{0}/{1}' -f $mappedSourceFile.Directory.Name, $mappedSourceFile.Name
         Set-Content -LiteralPath (Join-Path $moduleDirectory 'ExampleModule.psm1') -Value @(

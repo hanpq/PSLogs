@@ -1,6 +1,6 @@
 BeforeAll {
     $ProjectPath = (Resolve-Path "$PSScriptRoot\..\..").Path
-    . "$ProjectPath\source\Private\Format-Pattern.ps1"
+    . "$ProjectPath\source\private\Format-Pattern.ps1"
 
     $Logging = @{ Level = 'DEBUG'; Format = '[%{level}] %{message}' }
     $Target = . "$ProjectPath\source\include\OutputDebugString.ps1"
