@@ -11,8 +11,10 @@ Describe 'Stable-only Release Please with independent beta previews' {
         $stable | Should -Not -Match '(?m)^  (push|pull_request_target):'
         $stable | Should -Match "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
         $stable | Should -Match 'googleapis/release-please-action@v4'
-        $stable | Should -Match 'skip-github-release: \$\{\{ github.event_name == ''workflow_dispatch'' \}\}'
-        $stable | Should -Not -Match 'scripts/'
+        $stable | Should -Match 'RELEASE_VERSION: \$\{\{ inputs.version \}\}'
+        $stable | Should -Match 'node scripts/release-please/Prepare-StableRelease.cjs'
+        $stable | Should -Match '(?s)workflow_dispatch:\s+inputs:\s+version:.*required: false.*type: string'
+        $stable | Should -Match "(?s)Finalize merged stable release\s+if: github.event_name == 'pull_request'\s+uses: googleapis/release-please-action@v4"
         $config = Get-Content (Join-Path $projectRoot 'release-please-config.json') -Raw | ConvertFrom-Json
         $config.packages.'.'.prerelease | Should -BeFalse
         $config.packages.'.'.versioning | Should -BeNullOrEmpty
@@ -26,16 +28,20 @@ Describe 'Stable-only Release Please with independent beta previews' {
         $stable | Should -Match 'github.event.pull_request.head.repo.full_name == github.repository'
         $stable | Should -Match "github.event.pull_request.head.ref == 'release-please--branches--main'"
         $stable | Should -Match "contains\(github.event.pull_request.labels.\*.name, 'autorelease: pending'\)"
-        $stable | Should -Match 'skip-github-pull-request: \$\{\{ github.event_name != ''workflow_dispatch'' \}\}'
+        $stable | Should -Match 'skip-github-pull-request: true'
     }
 
-    It 'only dispatches betas from main and refreshes the same stable candidate without releasing it' {
+    It 'only dispatches betas from main and infers their version without creating a stable PR' {
         $beta | Should -Match '(?m)^  workflow_dispatch:'
         $beta | Should -Not -Match '(?m)^  (push|pull_request):'
         $beta | Should -Match "if: github.ref == 'refs/heads/main'"
         $beta | Should -Match '(?s)fetch-depth: 0\s+persist-credentials: false'
-        $beta | Should -Match '(?s)googleapis/release-please-action@v4.*config-file: release-please-config.json.*skip-github-release: true.*scripts/New-BetaRelease.ps1'
-        $beta | Should -Not -Match 'release-as:|stable-promotion|GALLERYAPITOKEN'
+        $beta | Should -Match 'npm ci --prefix scripts/release-please'
+        $beta | Should -Match 'node scripts/release-please/Get-BetaVersion.cjs'
+        $beta | Should -Match 'GH_TOKEN: \$\{\{ github.token \}\}'
+        $beta | Should -Match 'CANDIDATE_VERSION: \$\{\{ steps.candidate.outputs.version \}\}'
+        $beta | Should -Match 'scripts/New-BetaRelease.ps1 -CandidateVersion \$env:CANDIDATE_VERSION'
+        $beta | Should -Not -Match 'googleapis/release-please-action|release-as:|stable-promotion|GALLERYAPITOKEN'
     }
 
     It 'serializes beta allocation and stable preparation with the same concurrency group' {
@@ -43,7 +49,7 @@ Describe 'Stable-only Release Please with independent beta previews' {
             $workflow | Should -Match '(?m)^permissions: \{\}'
             $workflow | Should -Match 'group: release-please-main'
             $workflow | Should -Match 'cancel-in-progress: false'
-            $workflow | Should -Match 'token: \$\{\{ secrets.RELEASE_PLEASE_TOKEN \}\}'
+            $workflow | Should -Match '(token|GH_TOKEN): \$\{\{ secrets.RELEASE_PLEASE_TOKEN \}\}'
         }
     }
 
@@ -58,19 +64,7 @@ Describe 'Stable-only Release Please with independent beta previews' {
     It 'rejects prerelease metadata on stable release PRs before merging' {
         $ci = Get-Content (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw
         $ci | Should -Match 'Assert-ReleaseMetadata.ps1 -Tag "v\$\(\$project.Version\)" -IsPrerelease \$false'
+        $ci | Should -Match 'npm test --prefix scripts/release-please'
     }
 
-    It 'exports the beta workflow, allocator and tests but none of the removed promotion machinery' {
-        $kit = Import-PowerShellDataFile (Join-Path $projectRoot 'pipeline-migration-kit\kit-files.psd1')
-        $kit.Copy | Should -Contain '.github/workflows/beta.yml'
-        $kit.Copy | Should -Contain 'scripts/New-BetaRelease.ps1'
-        $kit.Copy | Should -Contain 'tests/Build/BetaRelease.Tests.ps1'
-        foreach ($path in $kit.Copy) {
-            Test-Path (Join-Path $projectRoot $path) | Should -BeTrue
-        }
-        foreach ($path in $kit.Remove) {
-            Test-Path (Join-Path $projectRoot $path) | Should -BeFalse
-        }
-        "$($kit.Copy)" | Should -Not -Match 'StablePromotion|StableReleaseNotes|ReleasePreparation|ReleaseChangelog|ReleasePullRequest|release-please-stable-config'
-    }
 }

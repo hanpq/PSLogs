@@ -52,7 +52,7 @@ Please the full documentation on the [docs site][pslogsdocs]
 
 ## Build and release
 
-See [BUILDING.md](BUILDING.md) for local build and test commands, dependency version pins, stable Release Please PRs, and the manual **Publish beta** workflow.
+See [BUILDING.md](BUILDING.md) for local build and test commands, dependency version pins, manually prepared stable Release Please PRs (with an optional version override), and the independent **Publish beta** workflow. Beta inference never opens or updates a stable PR; repeated dispatches create successive previews, and stable releases are rebuilt and tested independently rather than promoted from an exact beta source.
 
 ## License
 

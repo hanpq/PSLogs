@@ -22,11 +22,20 @@ Import the generated module from `output/PSLogs/<version>/` to try it locally. M
 
 Local tests run all suites by default. Use `-Task Test -TestSuite Module` for unit/QA tests or `-Task Test -TestSuite Infrastructure` for build/release tests. CI runs module tests with coverage across all supported platforms, and infrastructure tests once on Linux PowerShell 7 without coverage. Release publishing runs the module suite.
 
+Packaging tests use a fixture changelog and controlled Git tags/PR context, so their example module version is independent of the repository's current release. They verify development, stable release PR and stable tag notes while checking format assets in the built module and ZIP.
+
 Coverage instruments the built module that the tests execute, then uses ModuleBuilder's source mappings to report the original `source/public` and `source/private` files in `output/testResults/JaCoCo_coverage.xml`. The module test run fails if coverage is below the configured target (currently 1%).
 
 The QA suite in `tests/QA/module.tests.ps1` reports each file-quality check separately. It discovers source files and reads unit-test files once per run, and parses each function file once in its context's `BeforeAll`. Keep these shared inputs read-only so individual checks remain independent.
 
-Beta-allocation tests mock Git, the GitHub API and the GitHub CLI. They never create real tags or releases.
+Beta-allocation tests mock Git, the GitHub API and the GitHub CLI. They never create real tags or releases. Beta version-inference tests exercise the pinned Release Please library against a read-only GitHub fixture, including patch, minor, breaking and docs-only changes, and verify GraphQL request URLs through the real HTTP adapter for GitHub.com and GitHub Enterprise. CI runs these separately on Node.js 22; to run them locally:
+
+```powershell
+npm ci --prefix scripts/release-please --ignore-scripts --no-audit --no-fund
+npm test --prefix scripts/release-please
+```
+
+The same Node test command also checks stable preparation's automatic inference, explicit version overrides, invalid/non-increasing versions and PR-only behavior.
 
 ### VS Code shortcuts
 
@@ -52,22 +61,24 @@ For background logging, run the script in a regular PowerShell terminal, then us
 | Ordinary PR or push to `main` | None | CI only; never opens or refreshes a release PR. |
 | **Actions → Prepare stable release → Run workflow** (from `main`) | Stable preparation | Release Please opens or refreshes the stable release PR from Conventional Commits; never creates a tag/release. |
 | Merge the manually prepared stable release PR | Stable | Release Please finalizes its tag/GitHub release on the merged PR's close event; never prepares another PR. |
-| **Actions → Publish beta → Run workflow** (from `main`) | Beta preview | Refreshes the stable candidate, then creates a padded beta tag/GitHub prerelease for the dispatched commit. |
+| **Actions → Publish beta → Run workflow** (from `main`) | Beta preview | Infers the next version without creating a PR, then creates a beta tag/GitHub prerelease for the dispatched commit. |
 | GitHub release published | Its tag's channel | The Release workflow builds/tests the tag, validates and packages it, then publishes it. |
 
 ### Stable releases
 
-Release Please owns stable version inference, the release PR, changelog, tag and GitHub release. Start preparation explicitly with **Prepare stable release** on `main`, review its PR, wait for CI, then merge it when ready to authorize publishing. Preparation cannot publish, and finalization cannot prepare another PR. Ordinary pushes and ordinary PR merges do neither. A beta is optional, not a prerequisite for stable publishing; its manual dispatch also refreshes the stable candidate for version inference, but never publishes stable.
+Release Please owns stable version inference, the release PR, changelog, tag and GitHub release. Start preparation explicitly with **Prepare stable release** on `main`, review its PR, wait for CI, then merge it when ready to authorize publishing. Preparation cannot publish, and finalization cannot prepare another PR. Ordinary pushes and ordinary PR merges do neither. A beta is optional, not a prerequisite for stable publishing; its manual dispatch never opens or updates a stable PR and never publishes stable.
+
+The dispatch form has an optional **version** field. Leave it blank for Conventional Commit inference, or enter an exact stable version such as `5.8.0` (no `v`, prerelease or build suffix). Explicit versions must be newer than the tracked stable baseline. The pinned Release Please library prepares/updates the PR with this override in memory; no configuration edit or `Release-As:` commit is needed. The override applies only to that dispatch: another dispatch with a blank field recalculates automatically. Beta inference is unchanged and does not inherit this override. Always review the prepared version and changelog before merging.
 
 The tracked `.release-please-manifest.json` and `version.txt` stay on the last stable version until the stable PR merges. Beta publishing never updates them. Release Please therefore generates the next stable changelog from the previous stable release, covering all intervening releasable commits, regardless of how many betas were published. Historical beta changelog entries can remain untouched; new ones are not created.
 
 ### Beta previews
 
-Publish beta refreshes the normal stable PR without finalizing it, then reads the candidate version from that PR's immutable manifest. There is no second Conventional Commit parser, version override input, beta PR, or beta changelog. A stable candidate must exist: merge a releasable change first. If main advances while the candidate is refreshed, rerun the dispatch.
+Publish beta uses the pinned Release Please library's read-only `buildPullRequests()` planning API to infer the next stable version from the stable baseline and Conventional Commits. The plan stays in memory: it never creates or updates a PR, branch, label, stable tag or stable release. Version inference uses the read-only Actions token; only beta tag/prerelease creation uses `RELEASE_PLEASE_TOKEN`. No stable preparation or open stable PR is required. There is no second Conventional Commit parser, version override input, beta PR, or beta changelog. If there are no releasable changes, merge a releasable change first; if main advances during inference, rerun the dispatch.
 
 For example, after stable `5.7.2`, fixes infer `5.7.3-beta001`, then `5.7.3-beta002`. If a feature changes the stable candidate to `5.8.0`, its counter starts at `5.8.0-beta001`. The counter is one above the highest existing beta tag for that numeric version. Repeated dispatches on the same commit intentionally create successive preview versions.
 
-The beta tag points at the selected source SHA, not at the stable release PR. The build receives the beta tag version through `-Version` and uses short preview notes instead of reading the changelog. Stable and beta preparation share a concurrency group to serialize version allocation. Beta releases are marked prerelease and never marked latest.
+The beta tag points at the selected source SHA. The build receives the beta tag version through `-Version` and uses short preview notes instead of reading the changelog. Beta publishing and stable preparation share a concurrency group to serialize version allocation. Beta releases are marked prerelease and never marked latest.
 
 Stable is built and tested independently from the reviewed stable release commit; it is not guaranteed to be the exact source of the last beta. There is no post-beta path allowlist or promotion label.
 
@@ -103,6 +114,4 @@ Stable releases update getps.dev through `scripts/Update-Docs.ps1`. Generated co
 
 The build uses these pinned dependencies from `output/RequiredModules`; you do not need to install them separately.
 
-## Reuse this pipeline in other modules
-
-See [pipeline-migration-kit/README.md](pipeline-migration-kit/README.md) to migrate another module from Sampler, or to update an already migrated module.
+Pipeline kit: hanpq/PSModuleBuildReleaseTemplate@159c6cc887db52309f046016e415cd621fdc5c10

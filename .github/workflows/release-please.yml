@@ -6,6 +6,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Stable version, e.g. 1.0.0; blank = automatic'
+        required: false
+        type: string
 
 permissions: {}
 
@@ -15,6 +20,8 @@ concurrency:
 
 jobs:
   release:
+    permissions:
+      contents: read
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'pull_request' &&
@@ -24,10 +31,28 @@ jobs:
        contains(github.event.pull_request.labels.*.name, 'autorelease: pending'))
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: actions/checkout@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          node-version: '22'
+      - name: Install release preparation dependency
+        if: github.event_name == 'workflow_dispatch'
+        run: npm ci --prefix scripts/release-please --ignore-scripts --no-audit --no-fund
+      - name: Prepare stable release PR
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/release-please/Prepare-StableRelease.cjs
+      - name: Finalize merged stable release
+        if: github.event_name == 'pull_request'
+        uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           target-branch: main
           config-file: release-please-config.json
-          skip-github-release: ${{ github.event_name == 'workflow_dispatch' }}
-          skip-github-pull-request: ${{ github.event_name != 'workflow_dispatch' }}
+          skip-github-pull-request: true

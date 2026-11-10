@@ -75,3 +75,10 @@ jobs:
       - name: Test build and release automation
         shell: pwsh
         run: ./build.ps1 -Task Test -TestSuite Infrastructure
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Test release planning and preparation
+        run: |
+          npm ci --prefix scripts/release-please --ignore-scripts --no-audit --no-fund
+          npm test --prefix scripts/release-please
