@@ -2,7 +2,7 @@ BeforeAll {
     $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     $buildScript = Join-Path $projectRoot 'build.ps1'
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($buildScript, [ref]$null, [ref]$null)
-    foreach ($functionName in @('Import-BuildModule', 'Build-ProjectModule', 'Invoke-ModuleTests', 'New-ModulePackage'))
+    foreach ($functionName in @('Import-BuildModule', 'Limit-ReleaseNotes', 'Build-ProjectModule', 'Invoke-ModuleTests', 'New-ModulePackage'))
     {
         $definition = $ast.Find({
                 param($node)
@@ -18,6 +18,34 @@ BeforeAll {
     $OutputDirectory = Join-Path $TestDrive 'output'
     $TestResultsDirectory = Join-Path $OutputDirectory 'testResults'
     $ModuleName = 'ExampleModule'
+}
+
+Describe 'PowerShell Gallery release notes' {
+    It 'preserves notes that fit the gallery limit' {
+        $notes = "A short release note.`n"
+
+        (Limit-ReleaseNotes -ReleaseNotes $notes) | Should -BeExactly $notes
+    }
+
+    It 'truncates oversized notes at a line boundary and links to the changelog' {
+        $lines = 1..200 | ForEach-Object { "Release item $_ " + ('x' * 80) }
+        $notes = $lines -join "`n"
+
+        $limitedNotes = Limit-ReleaseNotes -ReleaseNotes $notes
+        $notice = "`n`nRelease notes are truncated. See the full changelog: https://github.com/hanpq/PSLogs/blob/main/CHANGELOG.md"
+        $body = $limitedNotes.Substring(0, $limitedNotes.Length - $notice.Length)
+
+        $limitedNotes.Length | Should -BeLessOrEqual 10000
+        $limitedNotes.EndsWith($notice) | Should -BeTrue
+        $notes.StartsWith($body) | Should -BeTrue
+    }
+
+    It 'rejects oversized notes when no whole-line truncation is possible' {
+        $notes = 'x' * 10001
+
+        { Limit-ReleaseNotes -ReleaseNotes $notes } |
+            Should -Throw '*cannot be shortened to fit the PowerShell Gallery limit*'
+    }
 }
 
 Describe 'Module metadata discovery' {
@@ -347,6 +375,26 @@ Describe 'Build test runner' {
         }
     }
 
+    It 'reports JaCoCo instruction coverage for mapped source files' {
+        Invoke-ModuleTests -ModuleVersion '1.2.3'
+
+        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter {
+            $Object -like 'Source coverage from JaCoCo (public/private only):*'
+        }
+    }
+
+    It 'filters tagged test runs and disables coverage' {
+        Invoke-ModuleTests -ModuleVersion '1.2.3' -Tag @('Unit', 'Write-Log')
+
+        Should -Invoke Invoke-Pester -Times 1 -Exactly -ParameterFilter {
+            $tags = @($Configuration.Filter.Tag.Value)
+            $tags.Count -eq 2 -and
+            $tags[0] -eq 'Unit' -and
+            $tags[1] -eq 'Write-Log' -and
+            -not $Configuration.CodeCoverage.Enabled.Value
+        }
+    }
+
     It 'does not start Pester when the analyzer cannot be imported' {
         Mock Import-BuildModule {
             throw 'Analyzer assembly conflict'
@@ -361,7 +409,8 @@ Describe 'Build test runner' {
     It 'selects <Suite> tests and coverage' -ForEach @(
         @{ Suite = 'Module'; Directories = @('tests\Unit', 'tests\QA'); Coverage = $true }
         @{ Suite = 'Infrastructure'; Directories = @('tests\Build'); Coverage = $false }
-        @{ Suite = 'All'; Directories = @('tests'); Coverage = $true }
+        @{ Suite = 'Integration'; Directories = @('tests\Integration'); Coverage = $false }
+        @{ Suite = 'All'; Directories = @('tests\Unit', 'tests\QA', 'tests\Build'); Coverage = $true }
     ) {
         Invoke-ModuleTests -ModuleVersion '1.2.3' -TestSuite $Suite
 
