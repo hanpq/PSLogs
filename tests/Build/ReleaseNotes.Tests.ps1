@@ -1,188 +1,55 @@
 BeforeAll {
-    $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-    $notesScript = Join-Path $projectRoot 'scripts\Get-StableReleaseNotes.ps1'
-    $fixture = @'
+    $notesScript = Join-Path $PSScriptRoot '..\..\scripts\Get-GalleryReleaseNotes.ps1'
+    $changelog = @'
 # Changelog
 
-## [2.0.0](https://github.com/example/module/compare/v2.0.0-beta002...v2.0.0) (2026-10-29)
+## [1.3.0](https://github.com/example/module/compare/v1.2.3...v1.3.0) (2026-11-10)
 
-### Bug Fixes
-
-* promote to stable
-
-## [2.0.0-beta002](https://github.com/example/module/compare/v1.1.0-beta001...v2.0.0-beta002) (2026-10-28)
-
-### Features
-
-* new feature
-
-### Bug Fixes
-
-* handle empty messages
-
-## [1.1.0-beta001](https://github.com/example/module/compare/v1.0.0...v1.1.0-beta001) (2026-10-27)
-
-### Features
-
-* new feature
-
-### BREAKING CHANGES
-
-* remove old option
-
-  Use the new option instead.
+* stable feature
 
 ## [Unreleased]
 
-* manually maintained note
-
-## [1.0.0] - 2026-10-01
-
-### Features
-
-* old stable feature
+* development note
 '@
-    $fixture = $fixture.Replace("`r`n", "`n")
-    $stableNotes = ($fixture -split '(?m)^## \[2.0.0-beta002\]')[0] -replace '\A# Changelog\s*', ''
-    $body = "Custom bot header`n---`n`n$($stableNotes.Trim())`n`n---`nCustom footer <!-- metadata -->"
 }
 
-Describe 'Gallery release note limits' {
-    BeforeAll {
-        $galleryNotesScript = Join-Path $projectRoot 'scripts\Get-GalleryReleaseNotes.ps1'
+Describe 'Release notes for stable and preview builds' {
+    It 'uses stable version notes on the release PR and tag' {
+        & $notesScript -Changelog $changelog -Version '1.3.0' -UseVersionSection |
+            Should -BeExactly '* stable feature'
+    }
+
+    It 'preserves Unreleased notes for ordinary untagged builds' {
+        & $notesScript -Changelog $changelog -Version '1.3.0' | Should -BeExactly '* development note'
+    }
+
+    It 'does not fall back to Unreleased when a stable release section is missing' {
+        { & $notesScript -Changelog $changelog -Version '1.3.1' -UseVersionSection } |
+            Should -Throw "*Could not find release notes section '1.3.1'*"
+    }
+
+    It 'builds beta notes without a changelog or a beta changelog section' {
+        $notes = & $notesScript -Version '1.4.0-beta001'
+        $notes | Should -Match 'Preview build 1.4.0-beta001'
+        $notes | Should -Match 'next stable release'
     }
 
     It 'preserves notes at or below 10,000 characters' -ForEach @(0, 9999, 10000) {
         $notes = 'x' * $_
-        & $galleryNotesScript -Notes $notes -Changelog $fixture | Should -BeExactly $notes
+        & $notesScript -Notes $notes -Changelog $changelog | Should -BeExactly $notes
     }
 
-    It 'shortens 11,000 characters to whole lines including the full changelog link within 10,000' {
+    It 'keeps whole lines and the full changelog link within 10,000 characters' {
         $notes = ("* " + ('x' * 96) + "`n") * 112
         $notes.Length | Should -BeGreaterThan 11000
-        $result = & $galleryNotesScript -Notes $notes -Changelog $fixture
+        $result = & $notesScript -Notes $notes -Changelog $changelog
         $result.Length | Should -BeLessOrEqual 10000
         $result | Should -Match 'Release notes are truncated. See the full changelog: https://github.com/example/module/blob/main/CHANGELOG.md'
         ($result -split "`n`nRelease notes are truncated")[0] | Should -Match ('x' * 96 + '$')
     }
 
     It 'fails explicitly when a single oversized line cannot be safely shortened' {
-        { & $galleryNotesScript -Notes ('x' * 11000) -Changelog $fixture } |
+        { & $notesScript -Notes ('x' * 11000) -Changelog $changelog } |
             Should -Throw '*preserving whole lines*'
-    }
-
-    It 'uses the proposed version notes before tagging a release PR' {
-        & $galleryNotesScript -Changelog $fixture -Version '2.0.0' -UseVersionSection |
-            Should -Match '\* promote to stable'
-    }
-
-    It 'preserves Unreleased notes for ordinary untagged builds even with a matching version section' {
-        $result = & $galleryNotesScript -Changelog $fixture -Version '2.0.0'
-        $result | Should -Match 'manually maintained note'
-        $result | Should -Not -Match 'promote to stable'
-    }
-
-    It 'does not fall back to Unreleased when the release PR version section is missing' {
-        { & $galleryNotesScript -Changelog $fixture -Version '2.0.1' -UseVersionSection } |
-            Should -Throw "*Could not find release notes section '2.0.1'*"
-    }
-}
-
-Describe 'Stable release note consolidation' {
-    It 'groups and deduplicates all beta notes since the previous stable release' {
-        $result = & $notesScript -Changelog $fixture -PullRequestBody $body -Version '2.0.0'
-        $notes = ($result.Changelog -split '(?m)^## \[2.0.0-beta002\]')[0]
-
-        $result.RolledUp | Should -BeTrue
-        $notes | Should -Match 'compare/v1\.0\.0\.\.\.v2\.0\.0'
-        $notes | Should -Match '\* promote to stable'
-        $notes | Should -Match '\* handle empty messages'
-        ([regex]::Matches($notes, '(?m)^\* new feature$')).Count | Should -Be 1
-        ([regex]::Matches($notes, '(?m)^### Bug Fixes$')).Count | Should -Be 1
-        $notes | Should -Match '(?s)\* remove old option\s+Use the new option instead\.'
-        $notes | Should -Not -Match 'old stable feature|manually maintained note'
-    }
-
-    It 'preserves historical entries and PR metadata while updating the PR notes' {
-        $result = & $notesScript -Changelog $fixture -PullRequestBody $body -Version '2.0.0'
-        $historical = $fixture.Substring($fixture.IndexOf('## [2.0.0-beta002]'))
-
-        $result.Changelog.EndsWith($historical) | Should -BeTrue
-        $result.PullRequestBody | Should -Match '\ACustom bot header\n---'
-        $result.PullRequestBody | Should -Match '---\nCustom footer <!-- metadata -->\z'
-        $result.PullRequestBody | Should -Match 'handle empty messages'
-        $result.PullRequestBody | Should -Not -Match '## \[2.0.0-beta002\]'
-    }
-
-    It 'is identical on reruns and after the bot regenerates the PR body' {
-        $first = & $notesScript -Changelog $fixture -PullRequestBody $body -Version '2.0.0'
-        $second = & $notesScript -Changelog $first.Changelog -PullRequestBody $first.PullRequestBody -Version '2.0.0'
-        $regenerated = & $notesScript -Changelog $first.Changelog -PullRequestBody $body -Version '2.0.0'
-
-        $second.Changelog | Should -BeExactly $first.Changelog
-        $second.PullRequestBody | Should -BeExactly $first.PullRequestBody
-        $regenerated.PullRequestBody | Should -BeExactly $first.PullRequestBody
-    }
-
-    It 'preserves introductory paragraphs without duplicating them on reruns' {
-        $withProse = $fixture.Replace("### Features`n`n* new feature",
-            "Important upgrade information.`n`n### Features`n`n* new feature")
-        $first = & $notesScript -Changelog $withProse -PullRequestBody $body -Version '2.0.0'
-        $second = & $notesScript -Changelog $first.Changelog -PullRequestBody $first.PullRequestBody -Version '2.0.0'
-        $second.Changelog | Should -BeExactly $first.Changelog
-        $notes = ($first.Changelog -split '(?m)^## \[2.0.0-beta002\]')[0]
-        ([regex]::Matches($notes, 'Important upgrade information\.')).Count | Should -Be 1
-    }
-
-    It 'preserves Windows line endings and non-ASCII text' {
-        $unicodeNote = "message $([char]0x00e5)$([char]0x00e4)$([char]0x00f6)"
-        $windowsFixture = $fixture.Replace('handle empty messages', $unicodeNote).Replace("`r`n", "`n").Replace("`n", "`r`n")
-        $windowsBody = $body.Replace("`n", "`r`n")
-        $result = & $notesScript -Changelog $windowsFixture -PullRequestBody $windowsBody -Version '2.0.0'
-
-        $result.Changelog | Should -Match ([regex]::Escape($unicodeNote))
-        $result.Changelog | Should -Not -Match '(?<!\r)\n'
-        $result.PullRequestBody | Should -Not -Match '(?<!\r)\n'
-    }
-
-    It 'does not modify a stable release without intervening betas' {
-        $withoutBetas = $fixture.Substring(0, $fixture.IndexOf('## [2.0.0-beta002]')) +
-            $fixture.Substring($fixture.IndexOf('## [1.0.0]'))
-        $result = & $notesScript -Changelog $withoutBetas -PullRequestBody $body -Version '2.0.0'
-
-        $result.RolledUp | Should -BeFalse
-        $result.Changelog | Should -BeExactly $withoutBetas
-        $result.PullRequestBody | Should -BeExactly $body
-    }
-
-    It 'rejects a mismatched tracked version' {
-        { & $notesScript -Changelog $fixture -PullRequestBody $body -Version '2.0.1' } |
-            Should -Throw '*first changelog release*'
-    }
-
-    It 'rejects missing stable boundaries' {
-        $withoutStable = $fixture.Substring(0, $fixture.IndexOf('## [1.0.0]'))
-        { & $notesScript -Changelog $withoutStable -PullRequestBody $body -Version '2.0.0' } |
-            Should -Throw '*without a previous stable*'
-    }
-
-    It 'rejects an inconsistent comparison baseline' {
-        { & $notesScript -Changelog $fixture.Replace('compare/v1.0.0...', 'compare/v0.9.0...') -PullRequestBody $body -Version '2.0.0' } |
-            Should -Throw '*comparison link*'
-    }
-
-    It 'rejects unknown release headings rather than omitting their notes' {
-        { & $notesScript -Changelog $fixture.Replace('## [1.1.0-beta001]', '## [1.1.0-beta.1]') -PullRequestBody $body -Version '2.0.0' } |
-            Should -Throw '*Unrecognized changelog heading*'
-    }
-
-    It 'rejects an unsupported PR body' {
-        { & $notesScript -Changelog $fixture -PullRequestBody 'Unexpected body format' -Version '2.0.0' } |
-            Should -Throw '*delimiters*'
-    }
-
-    It 'rejects PR notes for another release' {
-        { & $notesScript -Changelog $fixture -PullRequestBody $body.Replace('## [2.0.0]', '## [2.0.1]') -Version '2.0.0' } |
-            Should -Throw '*matching stable release*'
     }
 }

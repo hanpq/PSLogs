@@ -228,18 +228,24 @@ function Build-ProjectModule
         throw "ModuleBuilder did not create the expected module manifest: $modulePath"
     }
 
-    Write-Host 'Adding release notes from the changelog.'
-    $changelog = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'))
-    $releaseTags = & git -C $PSScriptRoot tag --points-at HEAD
-    if ($LASTEXITCODE -ne 0)
+    if ($ModuleVersion -cmatch '-beta[0-9]{3,}$')
     {
-        throw 'Could not read the Git tags for the current commit.'
+        $releaseNotes = & (Join-Path $PSScriptRoot 'scripts\Get-GalleryReleaseNotes.ps1') -Version $ModuleVersion
     }
-
-    $useVersionSection = $releaseTags -contains "v$ModuleVersion" -or
-        $env:GITHUB_HEAD_REF -ceq 'release-please--branches--main'
-    $releaseNotes = & (Join-Path $PSScriptRoot 'scripts\Get-GalleryReleaseNotes.ps1') `
-        -Changelog $changelog -Version $ModuleVersion -UseVersionSection:$useVersionSection
+    else
+    {
+        Write-Host 'Adding release notes from the changelog.'
+        $changelog = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'))
+        $releaseTags = & git -C $PSScriptRoot tag --points-at HEAD
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw 'Could not read the Git tags for the current commit.'
+        }
+        $useVersionSection = $releaseTags -contains "v$ModuleVersion" -or
+            $env:GITHUB_HEAD_REF -ceq 'release-please--branches--main'
+        $releaseNotes = & (Join-Path $PSScriptRoot 'scripts\Get-GalleryReleaseNotes.ps1') `
+            -Changelog $changelog -Version $ModuleVersion -UseVersionSection:$useVersionSection
+    }
     Update-Metadata -Path $modulePath -PropertyName PrivateData.PSData.ReleaseNotes -Value $releaseNotes -ErrorAction Stop
 
     $builtManifest = Import-PowerShellDataFile -LiteralPath $modulePath

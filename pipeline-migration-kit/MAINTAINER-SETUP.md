@@ -26,7 +26,7 @@ These are the steps an AI agent cannot do in the repository. Do them for each mi
 
 | Secret | Required | Value |
 | --- | --- | --- |
-| `RELEASE_PLEASE_TOKEN` | Yes | Fine-grained personal access token from your account with access to this repository and **Contents**, **Pull requests** and **Issues** set to read and write. One token can cover several repositories, including private ones. Release PRs must be created by the token owner; finalization checks this. |
+| `RELEASE_PLEASE_TOKEN` | Yes | Fine-grained personal access token with repository **Contents**, **Pull requests** and **Issues** read/write. Used by stable Release Please and beta release creation so their PR/release events trigger CI and publishing. One token can cover several repositories, including private ones. |
 | `GALLERYAPITOKEN` | Gallery modules | PowerShell Gallery API key with push rights for this module. Not used when the agent removed Gallery publishing. |
 | `CODECOV_TOKEN` | Yes | Upload token from Codecov for this repository. Private repositories cannot upload without it. |
 | `GITHUBTOKEN` | Gallery modules, for docs | Token with **Contents** read and write on `hanpq/getps.dev`. Without it, stable releases skip the getps.dev docs update. Not used when the agent removed the docs steps. |
@@ -44,7 +44,7 @@ Fine-grained tokens expire. When one does, releases or docs updates fail, so not
 **Settings → General → Pull Requests:**
 
 - Allow squash merging, with **Default commit message** set to **Pull request title**.
-- Allow merge commits if you want them. Disable **Allow rebase merging**; a stable promotion must be merged with squash or a merge commit.
+- Prefer squash merging for Release Please PRs. There is no longer a custom stable-promotion merge policy.
 
 **Settings → Actions → General:**
 
@@ -71,16 +71,16 @@ Fine-grained tokens expire. When one does, releases or docs updates fail, so not
 
 ## 5. First release
 
-The first release after the migration must be a beta. Stable promotion needs a published beta.
-
-1. Merge at least one `fix:` or `feat:` change. Release Please only prepares a release when there are releasable commits.
-2. **Actions → Prepare release → Run workflow → `beta`.**
-3. Review the release PR's version and notes, wait for CI and merge it.
-4. Check that the **Release** workflow succeeded, the GitHub release has a ZIP and the prerelease appears in the PowerShell Gallery or ProGet.
-5. When ready, run **Prepare release → `stable`**, review and merge the stable promotion PR, and check the Gallery or ProGet, and getps.dev for public modules.
+1. Merge at least one `fix:` or `feat:` change. **Prepare stable release** runs on pushes to `main` and opens/updates the stable PR; it can also be dispatched manually.
+2. Optionally select **Actions → Publish beta → Run workflow** on `main`. It refreshes the stable candidate and creates a GitHub prerelease such as `v1.3.0-beta001`, without merging the stable PR or changing tracked versions/changelog.
+3. Check that the triggered **Release** workflow succeeded, the beta has a ZIP, and its package appears in Gallery or ProGet. Repeating the dispatch increments the beta counter.
+4. When ready for stable, review the stable PR's version and complete stable-to-stable changelog, wait for CI, and merge it. Release Please creates the stable tag/release on the resulting main push.
+5. Check the stable **Release** workflow, Gallery or ProGet, and getps.dev for public modules. A beta is optional, and stable is independently built/tested rather than promoted from an identical beta commit.
 
 See `BUILDING.md` in the migrated repository for the day-to-day cheat sheet.
 
 ## Updating a migrated repository later
 
 When the PSLogs pipeline changes, export a new kit, copy it to the target repository and ask the agent to follow `AI-MIGRATION.md`. It detects that the repository is already migrated and switches to update mode. The `Pipeline kit:` line at the end of `BUILDING.md` shows which PSLogs commit each repository was last updated from.
+
+When upgrading from the old beta-PR/stable-promotion model, complete the guide's transition checks before merging the upgrade. Resolve old pending release PRs and any tracked beta baseline with the old pipeline first; do not blindly copy the workflows or reset versions. The kit's `Remove` inventory lists obsolete scripts/config/tests that must be removed.

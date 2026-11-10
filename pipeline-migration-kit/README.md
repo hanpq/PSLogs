@@ -8,7 +8,7 @@ PSLogs is the single source of truth. The kit does not contain copies of the pip
 | --- | --- |
 | [MAINTAINER-SETUP.md](MAINTAINER-SETUP.md) | Start here. How to run a migration, and the GitHub settings and secrets you must configure yourself. |
 | [AI-MIGRATION.md](AI-MIGRATION.md) | Step-by-step instructions for the AI agent working in the target repository. |
-| [kit-files.psd1](kit-files.psd1) | Which PSLogs files are copied unchanged (`Copy`) and which must be adapted per module (`Adapt`). |
+| [kit-files.psd1](kit-files.psd1) | Files copied unchanged (`Copy`), adapted per module (`Adapt`), and obsolete paths deleted during updates (`Remove`). |
 | [Export-PipelineKit.ps1](Export-PipelineKit.ps1) | Builds `output/pipeline-migration-kit/` with the documents, the files and a `KIT-VERSION.txt`. |
 
 ## Keeping the kit current
@@ -18,3 +18,5 @@ When you change the pipeline in PSLogs:
 - Add new pipeline files to `kit-files.psd1`, and remove deleted ones. The export fails if a listed file is not tracked by Git.
 - If the change affects how a module must be adapted, update `AI-MIGRATION.md`. If it needs a new secret or setting, update `MAINTAINER-SETUP.md`.
 - Commit before exporting, so `KIT-VERSION.txt` points to a real commit.
+
+The current model uses Release Please only for stable releases and a manually dispatched beta-preview workflow. Already-migrated modules must follow the transition checks in `AI-MIGRATION.md`, not just overwrite workflows: a tracked beta baseline or an old pending release PR needs resolution first.

@@ -29,7 +29,23 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot))
 }
 
 $project = & (Join-Path $PSScriptRoot 'Get-BuildProject.ps1') -ProjectRoot $ProjectRoot
-if ($Tag -cne "v$($project.Version)")
+if ($project.Prerelease)
+{
+    throw 'The tracked Release Please version must be stable; beta publishing must not update the stable baseline.'
+}
+if ($Tag -cnotmatch '^v\d+\.\d+\.\d+(?:-beta[0-9]{3,})?$')
+{
+    throw "Unsupported release tag '$Tag'. Expected vMajor.Minor.Patch with optional -betaNNN."
+}
+$tagProject = & (Join-Path $PSScriptRoot 'Get-BuildProject.ps1') -ProjectRoot $ProjectRoot -Version $Tag.Substring(1)
+if ($tagProject.Prerelease)
+{
+    if ([version]$tagProject.ModuleVersion -le [version]$project.ModuleVersion)
+    {
+        throw "Beta version '$($tagProject.Version)' must be newer than the stable baseline '$($project.Version)'."
+    }
+}
+elseif ($Tag -cne "v$($project.Version)")
 {
     throw "Release tag '$Tag' does not match tracked version 'v$($project.Version)'."
 }
@@ -38,6 +54,7 @@ if (-not [string]::IsNullOrWhiteSpace($RefTag) -and $Tag -cne $RefTag)
     throw "Release event tag '$Tag' does not match checked-out ref '$RefTag'."
 }
 
+$project = $tagProject
 $hasPrerelease = -not [string]::IsNullOrEmpty($project.Prerelease)
 if ($IsPrerelease -ne $hasPrerelease)
 {
@@ -63,7 +80,7 @@ if (-not [string]::IsNullOrWhiteSpace($BuiltModulePath))
     if ($builtVersion -cne $project.ModuleVersion -or $builtPrerelease -cne $project.Prerelease)
     {
         $builtFullVersion = if ($builtPrerelease) { "$builtVersion-$builtPrerelease" } else { $builtVersion }
-        throw "Built module version '$builtFullVersion' does not match tracked version '$($project.Version)'."
+        throw "Built module version '$builtFullVersion' does not match release version '$($project.Version)'."
     }
 }
 

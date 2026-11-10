@@ -1,0 +1,35 @@
+name: Publish beta
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Refresh stable version candidate
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          skip-github-release: true
+      - name: Create beta release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+        run: ./scripts/New-BetaRelease.ps1

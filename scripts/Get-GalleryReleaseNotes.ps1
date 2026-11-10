@@ -5,7 +5,8 @@ param
     [AllowEmptyString()]
     [string]$Notes,
 
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'Notes')]
+    [Parameter(ParameterSetName = 'Version')]
     [string]$Changelog,
 
     [Parameter(Mandatory, ParameterSetName = 'Version')]
@@ -18,6 +19,14 @@ param
 $ErrorActionPreference = 'Stop'
 if ($PSCmdlet.ParameterSetName -eq 'Version')
 {
+    if ($Version -cmatch '-beta[0-9]{3,}$')
+    {
+        return "Preview build $Version. The complete changelog will be generated with the next stable release."
+    }
+    if ([string]::IsNullOrWhiteSpace($Changelog))
+    {
+        throw 'A changelog is required for stable and development release notes.'
+    }
     $sectionVersion = if ($UseVersionSection) { $Version } else { 'Unreleased' }
     $pattern = '(?ms)^## \[' + [regex]::Escape($sectionVersion) + '\][^\r\n]*\r?\n(?<notes>.*?)(?=^## \[|\z)'
     $section = [regex]::Match($Changelog, $pattern)
