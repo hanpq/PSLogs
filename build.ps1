@@ -193,6 +193,7 @@ function Limit-ReleaseNotes
     param
     (
         [Parameter(Mandatory)]
+        [AllowEmptyString()]
         [string]
         $ReleaseNotes
     )

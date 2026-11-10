@@ -21,6 +21,18 @@ BeforeAll {
 }
 
 Describe 'PowerShell Gallery release notes' {
+    It 'accepts an empty Unreleased section' -ForEach @(
+        @{ Changelog = "## [Unreleased]`n`n## [1.2.3] - 2026-01-01`nPrevious release notes." }
+        @{ Changelog = "## [Unreleased]`r`n `r`n`t`r`n## [1.2.3] - 2026-01-01`r`nPrevious release notes." }
+    ) {
+        $match = [regex]::Match($Changelog, '(?ms)^## \[Unreleased\][^\r\n]*\r?\n(?<notes>.*?)(?=^## \[|\z)')
+
+        $match.Success | Should -BeTrue
+        $notes = Limit-ReleaseNotes -ReleaseNotes $match.Groups['notes'].Value.Trim()
+
+        $notes | Should -BeExactly ''
+    }
+
     It 'preserves notes that fit the gallery limit' {
         $notes = "A short release note.`n"
 

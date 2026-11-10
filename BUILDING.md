@@ -28,6 +28,8 @@ Coverage instruments the built module that the tests execute, then uses ModuleBu
 
 PowerShell Gallery release notes are limited to 10,000 characters during the build. Longer notes are truncated at a line boundary and include a link to the full changelog.
 
+Untagged builds use the `## [Unreleased]` changelog section for release notes. The heading must exist, but its content may be empty.
+
 The QA suite in `tests/QA/module.tests.ps1` reports each file-quality check separately. It discovers source files and reads unit-test files once per run, and parses each function file once in its context's `BeforeAll`. Keep these shared inputs read-only so individual checks remain independent.
 
 Stable-promotion tests mock Git and the GitHub API. They use temporary release-metadata files without initializing repositories or creating commits and tags; these are unit tests, not Git integration tests.
