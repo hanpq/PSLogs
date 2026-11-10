@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param
 (
+    [Parameter(Mandatory)]
+    [string]$CandidateVersion,
     [string]$Repository = $env:GITHUB_REPOSITORY,
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot)
 )
@@ -22,19 +24,9 @@ $api = "$env:GITHUB_API_URL/repos/$Repository"
 $main = Invoke-RestMethod -Uri "$api/git/ref/heads/main" -Headers $headers
 if ($main.object.sha -cne $sha)
 {
-    throw 'Main changed while the stable candidate was being refreshed. Rerun Publish beta.'
+    throw 'Main changed while the beta version was being inferred. Rerun Publish beta.'
 }
-$owner = $Repository.Split('/')[0]
-$pulls = @(Invoke-RestMethod -Uri "$api/pulls?state=open&base=main&head=$owner`:release-please--branches--main&per_page=100" -Headers $headers | ForEach-Object { $_ })
-$candidates = @($pulls | Where-Object { $_.head.repo.full_name -ceq $Repository })
-if ($candidates.Count -ne 1)
-{
-    throw 'Expected one open stable Release Please PR. Merge releasable Conventional Commits and rerun Publish beta.'
-}
-$pr = $candidates[0]
-$file = Invoke-RestMethod -Uri "$api/contents/.release-please-manifest.json?ref=$($pr.head.sha)" -Headers $headers
-if ($file.encoding -ne 'base64') { throw 'Expected a base64 stable release manifest.' }
-$version = ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($file.content)) | ConvertFrom-Json).'.'
+$version = $CandidateVersion
 $candidate = & "$PSScriptRoot\Get-BuildProject.ps1" -ProjectRoot $ProjectRoot -Version $version
 if ($candidate.Prerelease -or [version]$candidate.ModuleVersion -le [version]$project.ModuleVersion)
 {
@@ -42,7 +34,7 @@ if ($candidate.Prerelease -or [version]$candidate.ModuleVersion -le [version]$pr
 }
 $tags = @(& git -C $ProjectRoot tag --list "v$version*")
 if ($LASTEXITCODE -ne 0) { throw 'Could not read existing beta tags.' }
-if ("v$version" -cin $tags) { throw "Stable version '$version' is already tagged. Refresh the stable release PR before publishing a beta." }
+if ("v$version" -cin $tags) { throw "Stable version '$version' is already tagged. Merge releasable changes before publishing a beta." }
 $numbers = @($tags | ForEach-Object {
     if ($_ -cmatch "^v$([regex]::Escape($version))-beta([0-9]{3,})$") { [int]$Matches[1] }
 })

@@ -101,6 +101,16 @@ Describe 'Module metadata discovery' {
 }
 
 Describe 'Module packaging' {
+    BeforeEach {
+        $savedHeadRef = $env:GITHUB_HEAD_REF
+        $savedExitCode = $global:LASTEXITCODE
+    }
+
+    AfterEach {
+        $env:GITHUB_HEAD_REF = $savedHeadRef
+        $global:LASTEXITCODE = $savedExitCode
+    }
+
     It 'passes only the optional source parts that exist to ModuleBuilder' -ForEach @(
         @{ Parts = @(); ExpectedCopyPaths = $null; ExpectedPrefix = $null; ExpectedSuffix = $null }
         @{ Parts = @('en-US', 'prefix.ps1'); ExpectedCopyPaths = @('en-US'); ExpectedPrefix = 'prefix.ps1'; ExpectedSuffix = $null }
@@ -140,8 +150,40 @@ Describe 'Module packaging' {
         }
     }
 
-    It 'includes optional format assets in the built module and release archive' {
+    It 'includes optional format assets in the built module and release archive for <BuildContext>' -ForEach @(
+        @{ BuildContext = 'development'; HeadRef = ''; Tags = @(); ExpectedNotes = '* development note' }
+        @{ BuildContext = 'stable release PR'; HeadRef = 'release-please--branches--main'; Tags = @(); ExpectedNotes = '* stable note' }
+        @{ BuildContext = 'stable release tag'; HeadRef = ''; Tags = @('v1.2.3'); ExpectedNotes = '* stable note' }
+    ) {
         $fixture = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+        $fixtureScripts = Join-Path $fixture 'scripts'
+        New-Item -ItemType Directory -Path $fixtureScripts -Force | Out-Null
+        Copy-Item -LiteralPath $buildScript -Destination (Join-Path $fixture 'build.ps1')
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'scripts\Get-GalleryReleaseNotes.ps1') -Destination $fixtureScripts
+        Set-Content -LiteralPath (Join-Path $fixture 'CHANGELOG.md') -Value @'
+# Changelog
+
+## [Unreleased]
+
+* development note
+
+## [1.2.3]
+
+* stable note
+'@
+        $fixtureAst = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $fixture 'build.ps1'), [ref]$null, [ref]$null)
+        $fixtureBuild = $fixtureAst.Find({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -eq 'Build-ProjectModule'
+            }, $true)
+        Set-Item -Path Function:\Build-ProjectModule -Value $fixtureBuild.Body.GetScriptBlock()
+        $env:GITHUB_HEAD_REF = $HeadRef
+        Mock git {
+            $global:LASTEXITCODE = 0
+            $Tags
+        }
         $sourceDirectory = Join-Path $fixture 'source'
         $formatDirectory = Join-Path $sourceDirectory 'format'
         New-Item -ItemType Directory -Path $formatDirectory -Force | Out-Null
@@ -155,6 +197,8 @@ Describe 'Module packaging' {
 
         Build-ProjectModule -ModuleVersion '1.2.3' | Out-Null
         Test-Path -LiteralPath (Join-Path $BuiltModuleDirectory "1.2.3\format\$formatFile") | Should -BeTrue
+        $builtManifest = Import-PowerShellDataFile (Join-Path $BuiltModuleDirectory '1.2.3\ExampleModule.psd1')
+        $builtManifest.PrivateData.PSData.ReleaseNotes | Should -BeExactly $ExpectedNotes
 
         New-ModulePackage -ModuleVersion '1.2.3'
         $archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $OutputDirectory 'ExampleModule.1.2.3.zip'))
