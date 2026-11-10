@@ -228,32 +228,32 @@ function Build-ProjectModule
         throw "ModuleBuilder did not create the expected module manifest: $modulePath"
     }
 
-    Write-Host 'Adding release notes from the changelog.'
-    $changelog = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'))
-    $releaseTags = & git -C $PSScriptRoot tag --points-at HEAD
-    if ($LASTEXITCODE -ne 0)
+    if ($ModuleVersion -cmatch '-beta[0-9]{3,}$')
     {
-        throw 'Could not read the Git tags for the current commit.'
-    }
-
-    if ($releaseTags -contains "v$ModuleVersion")
-    {
-        $versionPattern = '(?ms)^## \[' + [regex]::Escape($ModuleVersion) + '\][^\r\n]*\r?\n(?<notes>.*?)(?=^## \[|\z)'
-        $releaseNotesMatch = [regex]::Match($changelog, $versionPattern)
+        $releaseNotes = & (Join-Path $PSScriptRoot 'scripts\Get-GalleryReleaseNotes.ps1') -Version $ModuleVersion
     }
     else
     {
-        $releaseNotesMatch = [regex]::Match($changelog, '(?ms)^## \[Unreleased\][^\r\n]*\r?\n(?<notes>.*?)(?=^## \[|\z)')
+        Write-Host 'Adding release notes from the changelog.'
+        $changelog = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'))
+        $releaseTags = & git -C $PSScriptRoot tag --points-at HEAD
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw 'Could not read the Git tags for the current commit.'
+        }
+        $useVersionSection = $releaseTags -contains "v$ModuleVersion" -or
+            $env:GITHUB_HEAD_REF -ceq 'release-please--branches--main'
+        $releaseNotes = & (Join-Path $PSScriptRoot 'scripts\Get-GalleryReleaseNotes.ps1') `
+            -Changelog $changelog -Version $ModuleVersion -UseVersionSection:$useVersionSection
     }
-
-    if (-not $releaseNotesMatch.Success)
-    {
-        throw "Could not find release notes for $ModuleName $ModuleVersion in CHANGELOG.md."
-    }
-
-    Update-Metadata -Path $modulePath -PropertyName PrivateData.PSData.ReleaseNotes -Value $releaseNotesMatch.Groups['notes'].Value.Trim() -ErrorAction Stop
+    Update-Metadata -Path $modulePath -PropertyName PrivateData.PSData.ReleaseNotes -Value $releaseNotes -ErrorAction Stop
 
     $builtManifest = Import-PowerShellDataFile -LiteralPath $modulePath
+    if ([string]$builtManifest.PrivateData.PSData.ReleaseNotes -and
+        $builtManifest.PrivateData.PSData.ReleaseNotes.Length -gt 10600)
+    {
+        throw 'The built manifest ReleaseNotes exceeds the PSGallery limit of 10,600 characters.'
+    }
     $expectedPrerelease = ($ModuleVersion -split '-', 2 | Select-Object -Skip 1) -join ''
     if ($builtManifest.ModuleVersion -ne $numericVersion -or
         [string]$builtManifest.PrivateData.PSData.Prerelease -cne $expectedPrerelease)

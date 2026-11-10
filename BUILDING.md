@@ -26,7 +26,7 @@ Coverage instruments the built module that the tests execute, then uses ModuleBu
 
 The QA suite in `tests/QA/module.tests.ps1` reports each file-quality check separately. It discovers source files and reads unit-test files once per run, and parses each function file once in its context's `BeforeAll`. Keep these shared inputs read-only so individual checks remain independent.
 
-Stable-promotion tests mock Git and the GitHub API. They use temporary release-metadata files without initializing repositories or creating commits and tags; these are unit tests, not Git integration tests.
+Beta-allocation tests mock Git, the GitHub API and the GitHub CLI. They never create real tags or releases.
 
 ### VS Code shortcuts
 
@@ -49,24 +49,37 @@ For background logging, run the script in a regular PowerShell terminal, then us
 
 | How it starts | Channel | What happens |
 | --- | --- | --- |
-| Ordinary PR or push to `main` | None | CI only; no release preparation or PR refresh. |
-| **Actions → Prepare release → Run workflow → `beta`** (from `main`) | Beta | Opens or explicitly refreshes the beta release PR when conventional commits warrant one; never creates a tag or release. |
-| **Actions → Prepare release → Run workflow → `stable`** (from `main`) | Stable promotion | Opens a stable promotion PR for the latest published beta, including with zero new commits. |
-| Merge the release PR | Its recorded channel | Finalizes the tag/GitHub release only; never prepares another PR. |
+| Ordinary PR | None | CI only. |
+| Push to `main`, or **Actions → Prepare stable release** | Stable preparation | Release Please opens or refreshes the stable release PR from Conventional Commits. |
+| Merge the stable release PR | Stable | Release Please creates the stable tag/GitHub release on the resulting push to `main`. |
+| **Actions → Publish beta → Run workflow** (from `main`) | Beta preview | Refreshes the stable candidate, then creates a padded beta tag/GitHub prerelease for the dispatched commit. |
+| GitHub release published | Its tag's channel | The Release workflow builds/tests the tag, validates and packages it, then publishes it. |
 
-Review the release PR version and notes, wait for CI, and merge it to publish. The release PR remains the gate for both channels. A stable promotion requires the latest beta to be published and `main` to have no commits after that beta; merge any pending beta release first. It creates a metadata-only release PR, so no config toggle or dummy fix commit is needed. Stable notes roll up beta entries since the previous stable release; beta entries remain in the changelog. Missing or unrecognized release boundaries fail the workflow instead of silently omitting notes.
+### Stable releases
 
-Keep `main` at that beta until the stable promotion merges, using squash or a merge commit (not rebase). Finalization rechecks the merge's first parent against the published beta tag; intervening changes fail closed instead of silently releasing untested changes as stable.
+Release Please owns stable version inference, the release PR, changelog, tag and GitHub release. Review its PR, wait for CI, then merge it when ready. A beta is optional, not a prerequisite for stable publishing.
 
-An open stable promotion blocks manual beta preparation. Re-running stable preparation leaves an existing promotion unchanged; close it to start over. Ordinary pushes never rewrite release PRs.
+The tracked `.release-please-manifest.json` and `version.txt` stay on the last stable version until the stable PR merges. Beta publishing never updates them. Release Please therefore generates the next stable changelog from the previous stable release, covering all intervening releasable commits, regardless of how many betas were published. Historical beta changelog entries can remain untouched; new ones are not created.
 
-Merged-PR finalization requires the same-repository release branch, pending label, generated bot metadata, and the author matching the dedicated `RELEASE_PLEASE_TOKEN` owner's login (a user/PAT token). Only the three release metadata files may change. The title, body, immutable head/merge manifests and `stable-promotion` label must agree before selecting the checked-in channel configuration. Do not edit channel labels or release metadata by hand. Finalization checks out trusted `main`, never the PR head, and refuses other merged pending releases rather than publishing them in the wrong channel. Resolve stale pending labels before retrying a failed finalization.
+### Beta previews
 
-`RELEASE_PLEASE_TOKEN` needs repository contents, issues and pull-request write access. It creates release PRs and releases so their events can trigger CI and publishing (unlike the default Actions token). The workflow has no default token permissions; its gated jobs grant the Actions token only contents-read access for checkout.
+Publish beta refreshes the normal stable PR without finalizing it, then reads the candidate version from that PR's immutable manifest. There is no second Conventional Commit parser, version override input, beta PR, or beta changelog. A stable candidate must exist: merge a releasable change first. If main advances while the candidate is refreshed, rerun the dispatch.
 
-The release workflow checks that the immutable tag, tracked version, GitHub prerelease flag, and built module manifest agree before publishing.
+For example, after stable `5.7.2`, fixes infer `5.7.3-beta001`, then `5.7.3-beta002`. If a feature changes the stable candidate to `5.8.0`, its counter starts at `5.8.0-beta001`. The counter is one above the highest existing beta tag for that numeric version. Repeated dispatches on the same commit intentionally create successive preview versions.
 
-The release workflow builds and tests the tag, attaches a ZIP to the GitHub release, and publishes the module to the PowerShell Gallery. Do not edit `.release-please-manifest.json` or toggle release configuration during routine development.
+The beta tag points at the selected source SHA, not at the stable release PR. The build receives the beta tag version through `-Version` and uses short preview notes instead of reading the changelog. Stable and beta preparation share a concurrency group to serialize version allocation. Beta releases are marked prerelease and never marked latest.
+
+Stable is built and tested independently from the reviewed stable release commit; it is not guaranteed to be the exact source of the last beta. There is no post-beta path allowlist or promotion label.
+
+### Validation and credentials
+
+Release PR CI rejects prerelease versions in the stable manifest. Stable PR/tag builds use their matching changelog section; ordinary untagged development builds still use `[Unreleased]`. Gallery notes retain whole lines and a full-changelog link within 10,000 characters. An oversized single line that cannot be shortened fails explicitly. Built manifests are checked against PSGallery's 10,600-character limit; the full stable changelog and GitHub release notes are not truncated.
+
+The Release workflow validates the tag, GitHub prerelease flag and built module version before publishing. Stable tags must match the tracked stable version; beta tags must have a newer numeric version and do not change the stable baseline.
+
+`RELEASE_PLEASE_TOKEN` needs repository contents, issues and pull-request write access. Both release workflows use it so their PR/release events can trigger CI and publishing (unlike the default Actions token). Do not edit release labels, tracked versions or release configuration during routine development, and do not use empty `Release-As:` commits to request betas.
+
+If publishing fails after a tag/GitHub release was created, rerun the failed Release job. If stable preparation reports an outstanding merged pending PR, retry its failed stable preparation first; never remove a pending label to bypass an unpublished stable release.
 
 Prereleases use padded labels such as `beta001`. Users must opt in when installing, for example:
 
