@@ -19,4 +19,4 @@ When you change the pipeline in PSLogs:
 - If the change affects how a module must be adapted, update `AI-MIGRATION.md`. If it needs a new secret or setting, update `MAINTAINER-SETUP.md`.
 - Commit before exporting, so `KIT-VERSION.txt` points to a real commit.
 
-The current model uses Release Please only for stable releases and a manually dispatched beta-preview workflow. Already-migrated modules must follow the transition checks in `AI-MIGRATION.md`, not just overwrite workflows: a tracked beta baseline or an old pending release PR needs resolution first.
+The current model uses manually dispatched stable preparation and beta previews. Merging a prepared stable PR authorizes finalization; ordinary pushes never prepare releases. Already-migrated modules must follow the transition checks in `AI-MIGRATION.md`, not just overwrite workflows: a tracked beta baseline or an old pending release PR needs resolution first.

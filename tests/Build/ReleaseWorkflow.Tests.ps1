@@ -6,15 +6,27 @@ BeforeAll {
 }
 
 Describe 'Stable-only Release Please with independent beta previews' {
-    It 'uses normal Release Please on main pushes and manual dispatch' {
-        $stable | Should -Match '(?s)push:\s+branches:\s+- main.*workflow_dispatch:'
-        $stable | Should -Match "if: github.ref == 'refs/heads/main'"
+    It 'prepares stable PRs only on explicit main dispatch and never publishes during preparation' {
+        $stable | Should -Match '(?m)^  workflow_dispatch:'
+        $stable | Should -Not -Match '(?m)^  (push|pull_request_target):'
+        $stable | Should -Match "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
         $stable | Should -Match 'googleapis/release-please-action@v4'
-        $stable | Should -Not -Match 'skip-github-release|skip-github-pull-request|pull_request:|scripts/'
+        $stable | Should -Match 'skip-github-release: \$\{\{ github.event_name == ''workflow_dispatch'' \}\}'
+        $stable | Should -Not -Match 'scripts/'
         $config = Get-Content (Join-Path $projectRoot 'release-please-config.json') -Raw | ConvertFrom-Json
         $config.packages.'.'.prerelease | Should -BeFalse
         $config.packages.'.'.versioning | Should -BeNullOrEmpty
         Test-Path (Join-Path $projectRoot 'release-please-stable-config.json') | Should -BeFalse
+    }
+
+    It 'only finalizes a merged pending same-repository release PR without preparing another PR' {
+        $stable | Should -Match '(?s)pull_request:\s+types: \[closed\]\s+branches:\s+- main'
+        $stable | Should -Match "github.event_name == 'pull_request'"
+        $stable | Should -Match 'github.event.pull_request.merged == true'
+        $stable | Should -Match 'github.event.pull_request.head.repo.full_name == github.repository'
+        $stable | Should -Match "github.event.pull_request.head.ref == 'release-please--branches--main'"
+        $stable | Should -Match "contains\(github.event.pull_request.labels.\*.name, 'autorelease: pending'\)"
+        $stable | Should -Match 'skip-github-pull-request: \$\{\{ github.event_name != ''workflow_dispatch'' \}\}'
     }
 
     It 'only dispatches betas from main and refreshes the same stable candidate without releasing it' {

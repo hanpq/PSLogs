@@ -71,10 +71,10 @@ Fine-grained tokens expire. When one does, releases or docs updates fail, so not
 
 ## 5. First release
 
-1. Merge at least one `fix:` or `feat:` change. **Prepare stable release** runs on pushes to `main` and opens/updates the stable PR; it can also be dispatched manually.
+1. Merge at least one `fix:` or `feat:` change. Ordinary pushes/PR merges run CI only and never prepare releases. For stable preparation, explicitly select **Actions → Prepare stable release → Run workflow** on `main`; this opens/updates the stable PR without publishing.
 2. Optionally select **Actions → Publish beta → Run workflow** on `main`. It refreshes the stable candidate and creates a GitHub prerelease such as `v1.3.0-beta001`, without merging the stable PR or changing tracked versions/changelog.
 3. Check that the triggered **Release** workflow succeeded, the beta has a ZIP, and its package appears in Gallery or ProGet. Repeating the dispatch increments the beta counter.
-4. When ready for stable, review the stable PR's version and complete stable-to-stable changelog, wait for CI, and merge it. Release Please creates the stable tag/release on the resulting main push.
+4. When ready for stable, dispatch **Prepare stable release** to prepare or refresh its PR, review its version and complete stable-to-stable changelog, wait for CI, and merge it to authorize publishing. Release Please finalizes only that merged release PR; it does not prepare another PR.
 5. Check the stable **Release** workflow, Gallery or ProGet, and getps.dev for public modules. A beta is optional, and stable is independently built/tested rather than promoted from an identical beta commit.
 
 See `BUILDING.md` in the migrated repository for the day-to-day cheat sheet.

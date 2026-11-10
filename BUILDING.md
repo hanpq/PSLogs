@@ -49,15 +49,15 @@ For background logging, run the script in a regular PowerShell terminal, then us
 
 | How it starts | Channel | What happens |
 | --- | --- | --- |
-| Ordinary PR | None | CI only. |
-| Push to `main`, or **Actions → Prepare stable release** | Stable preparation | Release Please opens or refreshes the stable release PR from Conventional Commits. |
-| Merge the stable release PR | Stable | Release Please creates the stable tag/GitHub release on the resulting push to `main`. |
+| Ordinary PR or push to `main` | None | CI only; never opens or refreshes a release PR. |
+| **Actions → Prepare stable release → Run workflow** (from `main`) | Stable preparation | Release Please opens or refreshes the stable release PR from Conventional Commits; never creates a tag/release. |
+| Merge the manually prepared stable release PR | Stable | Release Please finalizes its tag/GitHub release on the merged PR's close event; never prepares another PR. |
 | **Actions → Publish beta → Run workflow** (from `main`) | Beta preview | Refreshes the stable candidate, then creates a padded beta tag/GitHub prerelease for the dispatched commit. |
 | GitHub release published | Its tag's channel | The Release workflow builds/tests the tag, validates and packages it, then publishes it. |
 
 ### Stable releases
 
-Release Please owns stable version inference, the release PR, changelog, tag and GitHub release. Review its PR, wait for CI, then merge it when ready. A beta is optional, not a prerequisite for stable publishing.
+Release Please owns stable version inference, the release PR, changelog, tag and GitHub release. Start preparation explicitly with **Prepare stable release** on `main`, review its PR, wait for CI, then merge it when ready to authorize publishing. Preparation cannot publish, and finalization cannot prepare another PR. Ordinary pushes and ordinary PR merges do neither. A beta is optional, not a prerequisite for stable publishing; its manual dispatch also refreshes the stable candidate for version inference, but never publishes stable.
 
 The tracked `.release-please-manifest.json` and `version.txt` stay on the last stable version until the stable PR merges. Beta publishing never updates them. Release Please therefore generates the next stable changelog from the previous stable release, covering all intervening releasable commits, regardless of how many betas were published. Historical beta changelog entries can remain untouched; new ones are not created.
 
