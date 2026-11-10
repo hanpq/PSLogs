@@ -3,9 +3,7 @@
     "packages": {
         ".": {
             "release-type": "simple",
-            "versioning": "prerelease",
-            "prerelease": true,
-            "prerelease-type": "beta001"
+            "prerelease": false
         }
     }
 }
