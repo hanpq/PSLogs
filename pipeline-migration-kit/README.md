@@ -11,6 +11,8 @@ PSLogs is the single source of truth. The kit does not contain copies of the pip
 | [kit-files.psd1](kit-files.psd1) | Which PSLogs files are copied unchanged (`Copy`) and which must be adapted per module (`Adapt`). |
 | [Export-PipelineKit.ps1](Export-PipelineKit.ps1) | Builds `output/pipeline-migration-kit/` with the documents, the files and a `KIT-VERSION.txt`. |
 
+The kit includes an integration-test placeholder under `adapt/tests/Integration/Integration.Tests.ps1`. Both migration and update mode copy it only when the target file is missing, preserving existing integration tests.
+
 ## Keeping the kit current
 
 When you change the pipeline in PSLogs:

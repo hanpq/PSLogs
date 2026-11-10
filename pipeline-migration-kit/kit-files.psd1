@@ -33,6 +33,7 @@
         'BUILDING.md'
         'ModuleDebug.ps1'
         'tests/QA/module.tests.ps1'
+        'tests/Integration/Integration.Tests.ps1'
         '.vscode/launch.json'
         '.vscode/settings.json'
         '.github/CONTRIBUTING.md'
