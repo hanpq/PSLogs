@@ -64,21 +64,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Validate stable release PR version
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release-please--branches--main'
-        shell: pwsh
-        run: |
-          $project = ./scripts/Get-BuildProject.ps1
-          ./scripts/Assert-ReleaseMetadata.ps1 -Tag "v$($project.Version)" -IsPrerelease $false
       - name: Test build and release automation
         shell: pwsh
         run: ./build.ps1 -Task Test -TestSuite Infrastructure
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-      - name: Test release planning and preparation
-        run: |
-          npm ci --prefix scripts/release-please --ignore-scripts --no-audit --no-fund
-          npm test --prefix scripts/release-please

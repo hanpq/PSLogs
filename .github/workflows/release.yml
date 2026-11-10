@@ -34,11 +34,11 @@ jobs:
 
       - name: Build and test release
         shell: pwsh
-        run: ./build.ps1 -Task Test -TestSuite Module -Version $env:MODULE_VERSION
+        run: ./build.ps1 -Task Test -TestSuite Module
 
       - name: Package module
         shell: pwsh
-        run: ./build.ps1 -Task Package -Version $env:MODULE_VERSION
+        run: ./build.ps1 -Task Package
 
       - name: Validate packaged release metadata
         shell: pwsh

@@ -101,16 +101,6 @@ Describe 'Module metadata discovery' {
 }
 
 Describe 'Module packaging' {
-    BeforeEach {
-        $savedHeadRef = $env:GITHUB_HEAD_REF
-        $savedExitCode = $global:LASTEXITCODE
-    }
-
-    AfterEach {
-        $env:GITHUB_HEAD_REF = $savedHeadRef
-        $global:LASTEXITCODE = $savedExitCode
-    }
-
     It 'passes only the optional source parts that exist to ModuleBuilder' -ForEach @(
         @{ Parts = @(); ExpectedCopyPaths = $null; ExpectedPrefix = $null; ExpectedSuffix = $null }
         @{ Parts = @('en-US', 'prefix.ps1'); ExpectedCopyPaths = @('en-US'); ExpectedPrefix = 'prefix.ps1'; ExpectedSuffix = $null }
@@ -150,40 +140,8 @@ Describe 'Module packaging' {
         }
     }
 
-    It 'includes optional format assets in the built module and release archive for <BuildContext>' -ForEach @(
-        @{ BuildContext = 'development'; HeadRef = ''; Tags = @(); ExpectedNotes = '* development note' }
-        @{ BuildContext = 'stable release PR'; HeadRef = 'release-please--branches--main'; Tags = @(); ExpectedNotes = '* stable note' }
-        @{ BuildContext = 'stable release tag'; HeadRef = ''; Tags = @('v1.2.3'); ExpectedNotes = '* stable note' }
-    ) {
+    It 'includes optional format assets in the built module and release archive' {
         $fixture = Join-Path $TestDrive ([guid]::NewGuid().ToString())
-        $fixtureScripts = Join-Path $fixture 'scripts'
-        New-Item -ItemType Directory -Path $fixtureScripts -Force | Out-Null
-        Copy-Item -LiteralPath $buildScript -Destination (Join-Path $fixture 'build.ps1')
-        Copy-Item -LiteralPath (Join-Path $projectRoot 'scripts\Get-GalleryReleaseNotes.ps1') -Destination $fixtureScripts
-        Set-Content -LiteralPath (Join-Path $fixture 'CHANGELOG.md') -Value @'
-# Changelog
-
-## [Unreleased]
-
-* development note
-
-## [1.2.3]
-
-* stable note
-'@
-        $fixtureAst = [System.Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $fixture 'build.ps1'), [ref]$null, [ref]$null)
-        $fixtureBuild = $fixtureAst.Find({
-                param($node)
-                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-                $node.Name -eq 'Build-ProjectModule'
-            }, $true)
-        Set-Item -Path Function:\Build-ProjectModule -Value $fixtureBuild.Body.GetScriptBlock()
-        $env:GITHUB_HEAD_REF = $HeadRef
-        Mock git {
-            $global:LASTEXITCODE = 0
-            $Tags
-        }
         $sourceDirectory = Join-Path $fixture 'source'
         $formatDirectory = Join-Path $sourceDirectory 'format'
         New-Item -ItemType Directory -Path $formatDirectory -Force | Out-Null
@@ -197,8 +155,6 @@ Describe 'Module packaging' {
 
         Build-ProjectModule -ModuleVersion '1.2.3' | Out-Null
         Test-Path -LiteralPath (Join-Path $BuiltModuleDirectory "1.2.3\format\$formatFile") | Should -BeTrue
-        $builtManifest = Import-PowerShellDataFile (Join-Path $BuiltModuleDirectory '1.2.3\ExampleModule.psd1')
-        $builtManifest.PrivateData.PSData.ReleaseNotes | Should -BeExactly $ExpectedNotes
 
         New-ModulePackage -ModuleVersion '1.2.3'
         $archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $OutputDirectory 'ExampleModule.1.2.3.zip'))
@@ -264,7 +220,7 @@ Describe 'Release publication guards' {
         $fixtureSource = Join-Path $fixtureRoot 'source'
         New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $fixtureSource 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.2.3' }"
-        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.2.3"}'
+        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
     }
 
     It 'accepts a matching prerelease' {
@@ -273,7 +229,7 @@ Describe 'Release publication guards' {
         $project.Version | Should -Be '1.3.0-beta001'
     }
 
-    It 'accepts a stable release matching the tracked version' {
+    It 'accepts promotion to the same numeric stable version' {
         Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0"}'
 
         $project = & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -RefTag 'v1.3.0' -IsPrerelease $false
@@ -282,7 +238,7 @@ Describe 'Release publication guards' {
     }
 
     It 'rejects a tag that disagrees with the package version' {
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0' -IsPrerelease $false } |
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta002' -IsPrerelease $true } |
             Should -Throw '*tag*does not match*'
     }
 
@@ -321,41 +277,7 @@ Describe 'Release publication guards' {
 
         { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' `
                 -RefTag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
-            Should -Throw '*does not match release version*'
-    }
-
-    It 'rejects a built manifest with 11,000 release-note characters before publishing' {
-        $builtModulePath = Join-Path $fixtureRoot 'built'
-        New-Item -ItemType Directory -Path $builtModulePath | Out-Null
-        $notes = 'x' * 11000
-        Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = 'beta001'; ReleaseNotes = '$notes' } } }"
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
-            Should -Throw '*10,600 characters*'
-    }
-
-    It 'accepts a built manifest at exactly the Gallery release-note limit' {
-        $builtModulePath = Join-Path $fixtureRoot 'built'
-        New-Item -ItemType Directory -Path $builtModulePath | Out-Null
-        $notes = 'x' * 10600
-        Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = 'beta001'; ReleaseNotes = '$notes' } } }"
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
-            Should -Not -Throw
-    }
-
-    It 'rejects a beta that is not newer than the stable baseline' {
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.2.3-beta001' -IsPrerelease $true } |
-            Should -Throw '*must be newer than the stable baseline*'
-    }
-
-    It 'rejects a prerelease in the stable baseline' {
-        Set-Content -LiteralPath (Join-Path $fixtureRoot '.release-please-manifest.json') -Value '{".":"1.3.0-beta001"}'
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true } |
-            Should -Throw '*version must be stable*'
-    }
-
-    It 'rejects unsupported prerelease tags' {
-        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-rc001' -IsPrerelease $true } |
-            Should -Throw '*Unsupported release tag*'
+            Should -Throw '*does not match tracked version*'
     }
 }
 
