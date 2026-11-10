@@ -3,6 +3,18 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.4](https://github.com/hanpq/PSLogs/compare/v5.7.3...v5.7.4) (2026-11-10)
+
+### Bug Fixes
+
+* **release:** restore published version baseline after rollback ([9f53685](https://github.com/hanpq/PSLogs/commit/9f53685384c909431c2b5e78494a59ec590f4f87))
+
+* trigger beta release ([ab3ad83](https://github.com/hanpq/PSLogs/commit/ab3ad8341298267875e264f881adf7d53eb5d0fc))
+
+### Reverts
+
+* restore repository to 99b068d ([a27a4c4](https://github.com/hanpq/PSLogs/commit/a27a4c447f01888ce733bfb934b1d0a802068aea))
+
 ## [5.7.4-beta001](https://github.com/hanpq/PSLogs/compare/v5.7.3...v5.7.4-beta001) (2026-11-10)
 
 
