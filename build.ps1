@@ -205,7 +205,19 @@ function Limit-ReleaseNotes
         return $ReleaseNotes
     }
 
-    $changelogUrl = 'https://github.com/hanpq/PSLogs/blob/main/CHANGELOG.md'
+    $origin = & git -C $PSScriptRoot remote get-url origin
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw 'Could not read the Git origin URL for the release-note changelog link.'
+    }
+
+    $repositoryMatch = [regex]::Match($origin.Trim(), '^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)(?<owner>[^/]+)/(?<repository>[^/]+?)(?:\.git)?/?$')
+    if (-not $repositoryMatch.Success)
+    {
+        throw "Unsupported Git origin URL '$origin'. Expected a GitHub HTTPS or SSH URL."
+    }
+
+    $changelogUrl = 'https://github.com/{0}/{1}/blob/main/CHANGELOG.md' -f $repositoryMatch.Groups['owner'].Value, $repositoryMatch.Groups['repository'].Value
     $truncationNotice = "`n`nRelease notes are truncated. See the full changelog: $changelogUrl"
     $cut = $ReleaseNotes.LastIndexOf("`n", $maxReleaseNotesLength - $truncationNotice.Length)
     if ($cut -le 0)

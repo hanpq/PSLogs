@@ -21,6 +21,13 @@ BeforeAll {
 }
 
 Describe 'PowerShell Gallery release notes' {
+    BeforeEach {
+        Mock git {
+            $global:LASTEXITCODE = 0
+            'https://github.com/example/ExampleModule.git'
+        }
+    }
+
     It 'accepts an empty Unreleased section' -ForEach @(
         @{ Changelog = "## [Unreleased]`n`n## [1.2.3] - 2026-01-01`nPrevious release notes." }
         @{ Changelog = "## [Unreleased]`r`n `r`n`t`r`n## [1.2.3] - 2026-01-01`r`nPrevious release notes." }
@@ -39,17 +46,47 @@ Describe 'PowerShell Gallery release notes' {
         (Limit-ReleaseNotes -ReleaseNotes $notes) | Should -BeExactly $notes
     }
 
-    It 'truncates oversized notes at a line boundary and links to the changelog' {
+    It 'truncates oversized notes and links to the repository changelog for <Origin>' -ForEach @(
+        @{ Origin = 'https://github.com/example/ExampleModule.git' }
+        @{ Origin = 'https://github.com/example/ExampleModule' }
+        @{ Origin = 'git@github.com:example/ExampleModule.git' }
+        @{ Origin = 'ssh://git@github.com/example/ExampleModule.git' }
+    ) {
+        Mock git {
+            $global:LASTEXITCODE = 0
+            $Origin
+        }
         $lines = 1..200 | ForEach-Object { "Release item $_ " + ('x' * 80) }
         $notes = $lines -join "`n"
 
         $limitedNotes = Limit-ReleaseNotes -ReleaseNotes $notes
-        $notice = "`n`nRelease notes are truncated. See the full changelog: https://github.com/hanpq/PSLogs/blob/main/CHANGELOG.md"
+        $notice = "`n`nRelease notes are truncated. See the full changelog: https://github.com/example/ExampleModule/blob/main/CHANGELOG.md"
         $body = $limitedNotes.Substring(0, $limitedNotes.Length - $notice.Length)
 
         $limitedNotes.Length | Should -BeLessOrEqual 10000
         $limitedNotes.EndsWith($notice) | Should -BeTrue
         $notes.StartsWith($body) | Should -BeTrue
+        $lines | Should -Contain ($body -split "`n")[-1]
+        Should -Invoke git -Times 1 -Exactly -ParameterFilter {
+            $args -contains 'remote' -and $args -contains 'get-url' -and $args -contains 'origin'
+        }
+    }
+
+    It 'rejects an unsupported origin instead of linking to another repository' {
+        Mock git {
+            $global:LASTEXITCODE = 0
+            'https://example.com/example/ExampleModule.git'
+        }
+
+        { Limit-ReleaseNotes -ReleaseNotes (('Release item' + "`n") * 1000) } |
+            Should -Throw '*Unsupported Git origin URL*'
+    }
+
+    It 'fails explicitly when the Git origin cannot be read' {
+        Mock git { $global:LASTEXITCODE = 1 }
+
+        { Limit-ReleaseNotes -ReleaseNotes (('Release item' + "`n") * 1000) } |
+            Should -Throw '*Could not read the Git origin URL*'
     }
 
     It 'rejects oversized notes when no whole-line truncation is possible' {

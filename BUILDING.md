@@ -26,7 +26,7 @@ For a subset of tests, add Pester tags, for example `./build.ps1 -Task Test -Tes
 
 Coverage instruments the built module that the tests execute, then uses ModuleBuilder's source mappings to report the original `source/public` and `source/private` files in `output/testResults/JaCoCo_coverage.xml`. The build also prints the mapped source instruction coverage. The module test run fails if coverage is below the configured target (currently 1%).
 
-PowerShell Gallery release notes are limited to 10,000 characters during the build. Longer notes are truncated at a line boundary and include a link to the full changelog.
+PowerShell Gallery release notes are limited to 10,000 characters during the build. Longer notes are truncated at a line boundary and include a link to the full changelog on `main`, derived from the repository's Git `origin` URL (GitHub HTTPS or SSH).
 
 Untagged builds use the `## [Unreleased]` changelog section for release notes. The heading must exist, but its content may be empty.
 
