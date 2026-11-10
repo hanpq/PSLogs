@@ -279,6 +279,24 @@ Describe 'Release publication guards' {
                 -RefTag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
             Should -Throw '*does not match tracked version*'
     }
+
+    It 'rejects a built manifest with 11,000 release-note characters before publishing' {
+        $builtModulePath = Join-Path $fixtureRoot 'built'
+        New-Item -ItemType Directory -Path $builtModulePath | Out-Null
+        $notes = 'x' * 11000
+        Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = 'beta001'; ReleaseNotes = '$notes' } } }"
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
+            Should -Throw '*10,600 characters*'
+    }
+
+    It 'accepts a built manifest at exactly the Gallery release-note limit' {
+        $builtModulePath = Join-Path $fixtureRoot 'built'
+        New-Item -ItemType Directory -Path $builtModulePath | Out-Null
+        $notes = 'x' * 10600
+        Set-Content -LiteralPath (Join-Path $builtModulePath 'ExampleModule.psd1') -Value "@{ ModuleVersion = '1.3.0'; PrivateData = @{ PSData = @{ Prerelease = 'beta001'; ReleaseNotes = '$notes' } } }"
+        { & $assertScript -ProjectRoot $fixtureRoot -Tag 'v1.3.0-beta001' -IsPrerelease $true -BuiltModulePath $builtModulePath } |
+            Should -Not -Throw
+    }
 }
 
 Describe 'Pinned build module imports' {

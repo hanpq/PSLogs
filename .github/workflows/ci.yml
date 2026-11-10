@@ -64,6 +64,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Validate release PR changelog
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release-please--branches--main'
+        shell: pwsh
+        run: ./scripts/Assert-ReleaseChangelog.ps1 -ReleasePullRequest
       - name: Test build and release automation
         shell: pwsh
         run: ./build.ps1 -Task Test -TestSuite Infrastructure

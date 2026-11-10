@@ -72,6 +72,8 @@ Describe 'Stable promotion PR creation' {
             CheckoutSha = '0123456789abcdef0123456789abcdef01234567'
             BetaSha = '0123456789abcdef0123456789abcdef01234567'
             CommitsAfterBeta = 0
+            ChangedPaths = @()
+            Ancestor = $true
         }
         Mock git {
             param($Arguments)
@@ -88,6 +90,11 @@ Describe 'Stable promotion PR creation' {
                 'rev-list --count v2.0.0-beta001..HEAD' { return $gitState.CommitsAfterBeta }
                 'rev-parse v2.0.0-beta001^{commit}' { return $gitState.BetaSha }
                 'rev-parse HEAD' { return $gitState.CheckoutSha }
+                'merge-base --is-ancestor v2.0.0-beta001 HEAD' {
+                    if (-not $gitState.Ancestor) { $global:LASTEXITCODE = 1 }
+                    return
+                }
+                'diff --name-only --no-renames v2.0.0-beta001 HEAD' { return $gitState.ChangedPaths }
                 default { throw "Unexpected Git command: $Arguments" }
             }
         }
@@ -99,6 +106,7 @@ Describe 'Stable promotion PR creation' {
             MainSha = $gitState.CheckoutSha
             Release = @{ prerelease = $true; draft = $false; tag_name = 'v2.0.0-beta001'; published_at = '2026-10-29T12:00:00Z' }
             OtherBetas = @()
+            AppliedLabels = @(@{ name = 'stable-promotion' }, @{ name = 'autorelease: pending' })
         }
         Mock Invoke-RestMethod {
             param($Uri, $Method, $Body)
@@ -147,6 +155,10 @@ Describe 'Stable promotion PR creation' {
             if ($Uri -like '*/pulls' -and $Method -eq 'Post')
             {
                 return @{ number = 42 }
+            }
+            if ($Uri -like '*/pulls/42' -and -not $Method)
+            {
+                return @{ labels = $apiState.AppliedLabels }
             }
             if ($Uri -like '*/labels/*')
             {
@@ -242,12 +254,39 @@ Describe 'Stable promotion PR creation' {
         @($apiState.Requests | Where-Object Method -in @('Put', 'Patch', 'Post')).Count | Should -Be 0
     }
 
-    It 'does not create a promotion while commits remain after the beta' {
-        $gitState.CommitsAfterBeta = 1
+    It 'does not create a promotion when release inputs change after the beta' -ForEach @(
+        @{ Path = 'source/public/Example.ps1' }
+        @{ Path = 'build.ps1' }
+        @{ Path = 'RequiredModules.psd1' }
+        @{ Path = 'scripts/Update-Docs.ps1' }
+        @{ Path = '.github/workflows/ci.yml' }
+        @{ Path = 'README.md' }
+        @{ Path = 'Docs/page.md' }
+    ) {
+        $gitState.ChangedPaths = @($Path)
 
         { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
-            Should -Throw '*commit(s) after it*'
+            Should -Throw '*Only CHANGELOG.md and docs/** are allowed*'
         $apiState.Requests.Count | Should -Be 0
+    }
+
+    It 'allows only changelog and docs changes after the beta' {
+        $gitState.ChangedPaths = @('CHANGELOG.md', 'docs/guide.md', 'docs/nested/page.md')
+        & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot | Should -Be 42
+    }
+
+    It 'rejects a checkout that does not descend from the beta' {
+        $gitState.Ancestor = $false
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } | Should -Throw '*must be an ancestor*'
+        $apiState.Requests.Count | Should -Be 0
+    }
+
+    It 'fails if either required label was not actually applied' -ForEach @(
+        @{ Missing = 'stable-promotion' }, @{ Missing = 'autorelease: pending' }
+    ) {
+        $apiState.AppliedLabels = @($apiState.AppliedLabels | Where-Object name -NE $Missing)
+        { & $scriptUnderTest -Repository 'example/module' -ProjectRoot $fixtureRoot } |
+            Should -Throw '*#42*missing required labels after applying them*'
     }
 
     It 'updates an existing branch through the plural refs endpoint' {
@@ -293,7 +332,7 @@ Describe 'Stable promotion PR creation' {
         $apiState.OpenPullRequests = @(
             @{
                 number = 84
-                labels = @(@{ name = 'stable-promotion' })
+                labels = @(@{ name = 'stable-promotion' }, @{ name = 'autorelease: pending' })
             }
         )
 

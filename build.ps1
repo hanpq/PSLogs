@@ -236,24 +236,18 @@ function Build-ProjectModule
         throw 'Could not read the Git tags for the current commit.'
     }
 
-    if ($releaseTags -contains "v$ModuleVersion")
-    {
-        $versionPattern = '(?ms)^## \[' + [regex]::Escape($ModuleVersion) + '\][^\r\n]*\r?\n(?<notes>.*?)(?=^## \[|\z)'
-        $releaseNotesMatch = [regex]::Match($changelog, $versionPattern)
-    }
-    else
-    {
-        $releaseNotesMatch = [regex]::Match($changelog, '(?ms)^## \[Unreleased\][^\r\n]*\r?\n(?<notes>.*?)(?=^## \[|\z)')
-    }
-
-    if (-not $releaseNotesMatch.Success)
-    {
-        throw "Could not find release notes for $ModuleName $ModuleVersion in CHANGELOG.md."
-    }
-
-    Update-Metadata -Path $modulePath -PropertyName PrivateData.PSData.ReleaseNotes -Value $releaseNotesMatch.Groups['notes'].Value.Trim() -ErrorAction Stop
+    $useVersionSection = $releaseTags -contains "v$ModuleVersion" -or
+        $env:GITHUB_HEAD_REF -ceq 'release-please--branches--main'
+    $releaseNotes = & (Join-Path $PSScriptRoot 'scripts\Get-GalleryReleaseNotes.ps1') `
+        -Changelog $changelog -Version $ModuleVersion -UseVersionSection:$useVersionSection
+    Update-Metadata -Path $modulePath -PropertyName PrivateData.PSData.ReleaseNotes -Value $releaseNotes -ErrorAction Stop
 
     $builtManifest = Import-PowerShellDataFile -LiteralPath $modulePath
+    if ([string]$builtManifest.PrivateData.PSData.ReleaseNotes -and
+        $builtManifest.PrivateData.PSData.ReleaseNotes.Length -gt 10600)
+    {
+        throw 'The built manifest ReleaseNotes exceeds the PSGallery limit of 10,600 characters.'
+    }
     $expectedPrerelease = ($ModuleVersion -split '-', 2 | Select-Object -Skip 1) -join ''
     if ($builtManifest.ModuleVersion -ne $numericVersion -or
         [string]$builtManifest.PrivateData.PSData.Prerelease -cne $expectedPrerelease)

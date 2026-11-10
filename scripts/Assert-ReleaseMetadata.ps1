@@ -53,6 +53,11 @@ if (-not [string]::IsNullOrWhiteSpace($BuiltModulePath))
     }
 
     $builtManifest = Import-PowerShellDataFile -LiteralPath $builtManifestPath
+    if ([string]$builtManifest.PrivateData.PSData.ReleaseNotes -and
+        $builtManifest.PrivateData.PSData.ReleaseNotes.Length -gt 10600)
+    {
+        throw 'The built manifest ReleaseNotes exceeds the PSGallery limit of 10,600 characters.'
+    }
     $builtVersion = [string]$builtManifest.ModuleVersion
     $builtPrerelease = [string]$builtManifest.PrivateData.PSData.Prerelease
     if ($builtVersion -cne $project.ModuleVersion -or $builtPrerelease -cne $project.Prerelease)

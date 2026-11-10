@@ -92,11 +92,12 @@ if ($channel -eq 'stable')
     $betaTag = "v$betaVersion"
     $betaCommit = Invoke-RestMethod -Uri "$api/commits/$betaTag" -Headers $headers
     $betaRelease = Invoke-RestMethod -Uri "$api/releases/tags/$betaTag" -Headers $headers
-    if ($betaCommit.sha -cne $parentSha -or $betaRelease.tag_name -cne $betaTag -or
+    if (-not $betaCommit.sha -or $betaRelease.tag_name -cne $betaTag -or
         $betaRelease.draft -or -not $betaRelease.published_at -or -not $betaRelease.prerelease)
     {
-        throw 'Main advanced beyond the published beta while stable promotion was pending. Prepare a new beta first.'
+        throw 'The stable promotion must use a published beta. Prepare a new beta first.'
     }
+    & (Join-Path $PSScriptRoot 'Assert-StablePromotionChanges.ps1') -BetaRef $betaCommit.sha -HeadRef $parentSha
 }
 
 # Release Please scans all merged pending PRs, not just the triggering PR.

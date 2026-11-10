@@ -38,21 +38,7 @@ if ($LASTEXITCODE -ne 0)
 {
     throw "Latest beta tag '$tag' is not available in the checkout."
 }
-$commitsAfterBeta = & git -C $ProjectRoot rev-list --count "$tag..HEAD"
-if ($LASTEXITCODE -ne 0)
-{
-    throw "Could not compare HEAD with beta tag '$tag'."
-}
-if ([int]$commitsAfterBeta -ne 0)
-{
-    throw "Cannot promote '$tag' while main has $commitsAfterBeta commit(s) after it. Release or merge those changes as a beta first."
-}
-$betaSha = & git -C $ProjectRoot rev-parse "$tag^{commit}"
-$checkoutSha = & git -C $ProjectRoot rev-parse HEAD
-if ($LASTEXITCODE -ne 0 -or $betaSha -cne $checkoutSha)
-{
-    throw "Main must match the published beta tag '$tag' exactly."
-}
+& (Join-Path $PSScriptRoot 'Assert-StablePromotionChanges.ps1') -BetaRef $tag -ProjectRoot $ProjectRoot
 
 $headers = @{
     Authorization          = "Bearer $env:GH_TOKEN"
@@ -150,6 +136,10 @@ foreach ($pullRequest in $pullRequests)
     $stableReleaseBranch = $pullRequest.head.ref -ceq $branch
     if ('stable-promotion' -in $labels -or ($stableReleaseTitle -and $stableReleaseBranch))
     {
+        if ('stable-promotion' -notin $labels -or 'autorelease: pending' -notin $labels)
+        {
+            throw "Stable promotion #$($pullRequest.number) is missing required labels. Restore 'stable-promotion' and 'autorelease: pending' before retrying."
+        }
         Write-Output $pullRequest.number
         return
     }
@@ -247,6 +237,12 @@ foreach ($label in @('autorelease: pending', 'stable-promotion'))
 $labelsPayload = @{ labels = @('autorelease: pending', 'stable-promotion') } | ConvertTo-Json
 Invoke-RestMethod -Method Put -Uri "$api/issues/$($pullRequest.number)/labels" -Headers $headers `
     -ContentType 'application/json' -Body $labelsPayload | Out-Null
+$verifiedPullRequest = Invoke-RestMethod -Uri "$api/pulls/$($pullRequest.number)" -Headers $headers
+if ('stable-promotion' -notin $verifiedPullRequest.labels.name -or
+    'autorelease: pending' -notin $verifiedPullRequest.labels.name)
+{
+    throw "Stable promotion #$($pullRequest.number) is missing required labels after applying them. Restore 'stable-promotion' and 'autorelease: pending' before retrying."
+}
 
 Write-Verbose "Created stable promotion pull request #$($pullRequest.number) for $stableVersion."
 Write-Output $pullRequest.number

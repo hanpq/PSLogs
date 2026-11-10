@@ -1,5 +1,9 @@
 BeforeAll {
     $scriptUnderTest = Join-Path $PSScriptRoot '..\..\scripts\Assert-ReleasePullRequest.ps1'
+    function git {
+        param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
+        throw "Unexpected Git arguments: $Arguments"
+    }
 }
 
 Describe 'Merged release PR validation' {
@@ -23,6 +27,7 @@ Describe 'Merged release PR validation' {
             Other = @{ merged_at = $null; base = @{ ref = 'main' } }
             BaseVersion = '2.0.0-beta001'
             BetaCommit = 'beta-sha'
+            ChangedPaths = @()
             BetaRelease = @{ tag_name = 'v2.0.0-beta001'; draft = $false; prerelease = $true; published_at = '2026-10-29T12:00:00Z' }
             Files = @(
                 @{ filename = '.release-please-manifest.json'; status = 'modified' }
@@ -41,6 +46,13 @@ Describe 'Merged release PR validation' {
                 labels = @(@{ name = 'autorelease: pending' })
                 changed_files = 3
             }
+        }
+        Mock git {
+            param($Arguments)
+            $global:LASTEXITCODE = 0
+            if ($Arguments -contains 'merge-base') { return }
+            if ($Arguments -contains 'diff') { return $apiState.ChangedPaths }
+            throw "Unexpected Git command: $Arguments"
         }
         Mock Invoke-RestMethod {
             param($Uri, $Method)
@@ -152,12 +164,27 @@ Describe 'Merged release PR validation' {
         $apiState.Pr.labels += @{ name = 'stable-promotion' }
         switch ($Field)
         {
-            main-advanced { $apiState.BetaCommit = 'older-beta-sha' }
+            main-advanced { $apiState.BetaCommit = 'older-beta-sha'; $apiState.ChangedPaths = @('source/public/Example.ps1') }
             other-version { $apiState.BaseVersion = '2.1.0-beta001' }
             draft { $apiState.BetaRelease.draft = $true }
         }
+
         { & $scriptUnderTest -Repository 'example/module' -PullRequestNumber 42 -MergeSha merged-sha } |
             Should -Throw '*published beta*'
+    }
+
+    It 'finalizes a stable promotion after documentation-only changes' {
+        $apiState.Version = $apiState.MergeVersion = '2.0.0'
+        $apiState.Pr.title = 'chore(main): release 2.0.0'
+        $apiState.Pr.body = $apiState.Pr.body.Replace('2.0.0-beta001', '2.0.0')
+        $apiState.Pr.labels += @{ name = 'stable-promotion' }
+        $apiState.BetaCommit = 'older-beta-sha'
+        $apiState.ChangedPaths = @('CHANGELOG.md', 'docs/guide.md')
+        & $scriptUnderTest -Repository 'example/module' -PullRequestNumber 42 -MergeSha merged-sha |
+            Should -BeExactly stable
+        Should -Invoke git -Times 1 -Exactly -ParameterFilter {
+            $Arguments -contains 'older-beta-sha' -and $Arguments -contains 'beta-sha' -and $Arguments -contains 'diff'
+        }
     }
 
     It 'refuses a second merged pending release rather than publishing it with the wrong config' {

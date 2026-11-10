@@ -47,6 +47,47 @@ BeforeAll {
     $body = "Custom bot header`n---`n`n$($stableNotes.Trim())`n`n---`nCustom footer <!-- metadata -->"
 }
 
+Describe 'Gallery release note limits' {
+    BeforeAll {
+        $galleryNotesScript = Join-Path $projectRoot 'scripts\Get-GalleryReleaseNotes.ps1'
+    }
+
+    It 'preserves notes at or below 10,000 characters' -ForEach @(0, 9999, 10000) {
+        $notes = 'x' * $_
+        & $galleryNotesScript -Notes $notes -Changelog $fixture | Should -BeExactly $notes
+    }
+
+    It 'shortens 11,000 characters to whole lines including the full changelog link within 10,000' {
+        $notes = ("* " + ('x' * 96) + "`n") * 112
+        $notes.Length | Should -BeGreaterThan 11000
+        $result = & $galleryNotesScript -Notes $notes -Changelog $fixture
+        $result.Length | Should -BeLessOrEqual 10000
+        $result | Should -Match 'Release notes are truncated. See the full changelog: https://github.com/example/module/blob/main/CHANGELOG.md'
+        ($result -split "`n`nRelease notes are truncated")[0] | Should -Match ('x' * 96 + '$')
+    }
+
+    It 'fails explicitly when a single oversized line cannot be safely shortened' {
+        { & $galleryNotesScript -Notes ('x' * 11000) -Changelog $fixture } |
+            Should -Throw '*preserving whole lines*'
+    }
+
+    It 'uses the proposed version notes before tagging a release PR' {
+        & $galleryNotesScript -Changelog $fixture -Version '2.0.0' -UseVersionSection |
+            Should -Match '\* promote to stable'
+    }
+
+    It 'preserves Unreleased notes for ordinary untagged builds even with a matching version section' {
+        $result = & $galleryNotesScript -Changelog $fixture -Version '2.0.0'
+        $result | Should -Match 'manually maintained note'
+        $result | Should -Not -Match 'promote to stable'
+    }
+
+    It 'does not fall back to Unreleased when the release PR version section is missing' {
+        { & $galleryNotesScript -Changelog $fixture -Version '2.0.1' -UseVersionSection } |
+            Should -Throw "*Could not find release notes section '2.0.1'*"
+    }
+}
+
 Describe 'Stable release note consolidation' {
     It 'groups and deduplicates all beta notes since the previous stable release' {
         $result = & $notesScript -Changelog $fixture -PullRequestBody $body -Version '2.0.0'

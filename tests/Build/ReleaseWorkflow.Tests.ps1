@@ -17,8 +17,8 @@ Describe 'Release workflow contract' {
 
     It 'prepares only on an explicit main dispatch, without ever creating releases' {
         $prepare | Should -Match "if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
-        $prepare | Should -Match '(?s)if: inputs.channel == ''beta''.*?skip-github-release: true'
-        $prepare | Should -Match "if: inputs.channel == 'stable'"
+        $prepare | Should -Match '(?s)if: steps.preparation.outputs.skip != ''true'' && inputs.channel == ''beta''.*?skip-github-release: true'
+        $prepare | Should -Match "if: steps.preparation.outputs.skip != 'true' && inputs.channel == 'stable'"
         $prepare | Should -Not -Match 'skip-github-pull-request'
         $prepare | Should -Not -Match 'Update-StableReleaseNotes|Get-ReleaseChannel'
     }
@@ -33,12 +33,31 @@ Describe 'Release workflow contract' {
     }
 
     It 'checks trusted main and validates metadata before release-only finalization' {
-        $finalize | Should -Match '(?s)actions/checkout@v6.*?ref: main\s+persist-credentials: false'
+        $finalize | Should -Match '(?s)actions/checkout@v6.*?ref: main\s+fetch-depth: 0\s+persist-credentials: false'
         $finalize | Should -Not -Match 'ref:.*(head|merge_commit)'
         $finalize | Should -Match '(?s)Assert-ReleasePullRequest.ps1.*?googleapis/release-please-action@v4'
         $finalize | Should -Match 'skip-github-pull-request: true'
         $finalize | Should -Not -Match 'skip-github-release'
         $finalize | Should -Match 'if \(\$channel -eq ''stable''\).*''release-please-stable-config.json''.*''release-please-config.json'''
+    }
+
+    It 'validates before release-please and gates every mutating step on duplicate detection' {
+        $prepare | Should -Match '(?s)Get-ReleasePreparation.ps1.*Assert-ReleaseChangelog.ps1.*googleapis/release-please-action@v4'
+        ([regex]::Matches($prepare, "if: steps.preparation.outputs.skip != 'true'")).Count | Should -Be 5
+        $prepare | Should -Match '(?s)googleapis/release-please-action@v4.*Set-ReleasePreparation.ps1'
+    }
+
+    It 'accepts a version without interpolating input into executable script text' {
+        $prepare | Should -Match '(?s)version:\s+description:.*?type: string\s+required: false'
+        $prepare | Should -Match 'RELEASE_VERSION: \$\{\{ inputs.version \}\}'
+        $prepare | Should -Match 'release-as: \$\{\{ steps.preparation.outputs.version \}\}'
+        $prepare | Should -Match 'release-type: \$\{\{ steps.preparation.outputs.version != '''' && ''simple'' \|\| '''' \}\}'
+        $prepare | Should -Not -Match '-Version \$\{\{'
+    }
+
+    It 'checks release PR changelog boundaries during CI with all tags available' {
+        $ci = Get-Content (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw
+        $ci | Should -Match '(?s)infrastructure:.*fetch-depth: 0.*Assert-ReleaseChangelog.ps1 -ReleasePullRequest'
     }
 
     It 'serializes both modes and grants no default permissions' {
