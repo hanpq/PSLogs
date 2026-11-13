@@ -96,6 +96,6 @@ Stable releases update getps.dev through `scripts/Update-Docs.ps1`. Generated co
 
 The build uses these pinned dependencies from `output/RequiredModules`; you do not need to install them separately.
 
-## Reuse this pipeline in other modules
+## Shared build and release pipeline
 
-See [pipeline-migration-kit/README.md](pipeline-migration-kit/README.md) to migrate another module from Sampler, or to update an already migrated module.
+The canonical build and release pipeline kit is maintained in [ManageThePowerShellModules](https://github.com/hanpq/ManageThePowerShellModules/tree/main/module-kit). Use it to scaffold, migrate, or update other module repositories.
